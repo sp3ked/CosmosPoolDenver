@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import DashNav from "../components/DashNav";
 import SpaceBackground from "../components/backgrounds/spaceBg";
-import { motion } from "framer-motion";
 import { useNotification } from "../context/NotificationContext";
 
 // Mock data interface based on the smart contract data structure
@@ -21,6 +21,8 @@ interface Deposit {
   };
   timestamp: number;
   liquidityTokens?: number;
+  completed?: boolean; // Added to track if the deposit is completed
+  cancelReason?: string; // Added to indicate why a deposit was canceled or completed early
 }
 
 function Holdings() {
@@ -30,6 +32,7 @@ function Holdings() {
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const [selectedDeposit, setSelectedDeposit] = useState<Deposit | null>(null);
   const [timeLeft, setTimeLeft] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
 
   // Mock data to simulate user's deposits
   useEffect(() => {
@@ -50,7 +53,8 @@ function Holdings() {
           amount: 4500
         },
         timestamp: Date.now() - (20 * 60 * 60 * 1000), // 20 hours ago
-        liquidityTokens: 123.45
+        liquidityTokens: 123.45,
+        completed: false
       },
       {
         depositId: "2",
@@ -62,7 +66,8 @@ function Holdings() {
         token: 'volatile',
         amount: 1.5,
         matched: false,
-        timestamp: Date.now() - (2 * 60 * 60 * 1000), // 2 hours ago
+        timestamp: Date.now() - (2 * 60 * 60 * 1000), // 2 hours ago,
+        completed: false
       },
       {
         depositId: "3",
@@ -79,7 +84,40 @@ function Holdings() {
           amount: 1.1
         },
         timestamp: Date.now() - (25 * 60 * 60 * 1000), // 25 hours ago
-        liquidityTokens: 85.32
+        liquidityTokens: 85.32,
+        completed: true
+      },
+      {
+        depositId: "4",
+        pool: {
+          tokenA: "SOL",
+          tokenB: "USDT",
+          apr: "21.7%"
+        },
+        token: 'volatile',
+        amount: 5.75,
+        matched: true,
+        matchedWith: {
+          address: "0xab12...7f42",
+          amount: 275.5
+        },
+        timestamp: Date.now() - (30 * 24 * 60 * 60 * 1000), // 30 days ago
+        liquidityTokens: 342.18,
+        completed: true
+      },
+      {
+        depositId: "5",
+        pool: {
+          tokenA: "ETH",
+          tokenB: "DAI",
+          apr: "15.8%"
+        },
+        token: 'volatile',
+        amount: 3.2,
+        matched: false,
+        timestamp: Date.now() - (5 * 24 * 60 * 60 * 1000), // 5 days ago
+        completed: true,
+        cancelReason: "Unmatched after 5 days"
       }
     ];
 
@@ -88,6 +126,26 @@ function Holdings() {
       setLoading(false);
     }, 1000);
   }, []);
+
+  // Filter deposits based on active tab
+  const activeDeposits = deposits.filter(d => !d.completed);
+  const completedDeposits = deposits.filter(d => d.completed);
+
+  // Sort active deposits - unmatched first, then by time left
+  const sortedActiveDeposits = [...activeDeposits].sort((a, b) => {
+    // Unmatched deposits first
+    if (!a.matched && b.matched) return -1;
+    if (a.matched && !b.matched) return 1;
+    
+    // Then sort by timestamp (newer first for unmatched, older first for matched)
+    if (!a.matched) return b.timestamp - a.timestamp;
+    return a.timestamp - b.timestamp;
+  });
+
+  // Sort completed deposits - newest first
+  const sortedCompletedDeposits = [...completedDeposits].sort((a, b) => 
+    b.timestamp - a.timestamp
+  );
 
   // Update the time left for each deposit every second
   useEffect(() => {
@@ -136,12 +194,23 @@ function Holdings() {
       // This would call the contract's withdraw function
       console.log(`Withdrawing deposit ${selectedDeposit.depositId}`);
       
-      // Remove the deposit from the list after successful withdrawal
-      setDeposits(prev => prev.filter(d => d.depositId !== selectedDeposit.depositId));
-      setWithdrawModalOpen(false);
-      
       const isEarlyWithdrawal = !selectedDeposit.matched || 
         ((selectedDeposit.timestamp + 24 * 60 * 60 * 1000) > Date.now());
+      
+      // Mark the deposit as completed instead of removing it
+      setDeposits(prev => prev.map(d => 
+        d.depositId === selectedDeposit.depositId 
+          ? {
+              ...d, 
+              completed: true, 
+              cancelReason: isEarlyWithdrawal ? 
+                (d.matched ? "Early withdrawal" : "Canceled by user") : 
+                undefined
+            } 
+          : d
+      ));
+      
+      setWithdrawModalOpen(false);
       
       if (isEarlyWithdrawal) {
         showNotification(
@@ -171,6 +240,140 @@ function Holdings() {
     }
   };
 
+  // Render deposit card based on its status
+  const renderDepositCard = (deposit: Deposit) => {
+    const isWithdrawable = deposit.matched && (timeLeft[deposit.depositId] || 0) === 0 && !deposit.completed;
+    const isMatched = deposit.matched;
+    
+    return (
+      <motion.div
+        key={deposit.depositId}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="bg-black/50 border border-blue-800/50 rounded-lg overflow-hidden hover:border-blue-500/60 transition-all shadow-lg"
+      >
+        {/* Header with pool name and status */}
+        <div className="bg-gradient-to-r from-blue-900/40 to-purple-900/40 p-4 flex justify-between items-center border-b border-blue-900/30">
+          <h3 className="text-xl font-bold text-white">
+            {deposit.pool.tokenA}/{deposit.pool.tokenB}
+          </h3>
+          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+            deposit.completed
+              ? deposit.cancelReason 
+                ? "bg-red-500/20 text-red-300"
+                : "bg-green-500/20 text-green-300"
+              : isWithdrawable 
+                ? "bg-green-500/20 text-green-300" 
+                : isMatched
+                  ? "bg-blue-500/20 text-blue-300"
+                  : "bg-yellow-500/20 text-yellow-300"
+          }`}>
+            {deposit.completed
+              ? deposit.cancelReason 
+                ? "Canceled" 
+                : "Completed"
+              : isWithdrawable 
+                ? "Ready to Withdraw" 
+                : isMatched
+                  ? "Matched & Locked"
+                  : "Awaiting Match"}
+          </div>
+        </div>
+        
+        {/* Deposit details */}
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            <div className="flex flex-col">
+              <span className="text-gray-400 text-sm">You deposited</span>
+              <span className="text-white font-bold">
+                {deposit.amount} {deposit.token === 'volatile' ? deposit.pool.tokenA : deposit.pool.tokenB}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-400 text-sm">Expected APR</span>
+              <span className="text-green-400 font-bold">{deposit.pool.apr}</span>
+            </div>
+            
+            {isMatched && (
+              <>
+                <div className="flex flex-col">
+                  <span className="text-gray-400 text-sm">Matched with</span>
+                  <div className="flex items-center">
+                    <span className="text-white font-medium text-sm">
+                      {deposit.matchedWith?.amount} {deposit.token === 'volatile' ? deposit.pool.tokenB : deposit.pool.tokenA}
+                    </span>
+                    <span className="text-gray-500 text-xs ml-2">({deposit.matchedWith?.address})</span>
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-400 text-sm">Liquidity tokens</span>
+                  <span className="text-white font-medium">{deposit.liquidityTokens?.toFixed(2)} LP</span>
+                </div>
+              </>
+            )}
+          </div>
+          
+          {/* State display */}
+          <div className="mt-5 pt-4 border-t border-blue-900/30">
+            {!isMatched && !deposit.completed ? (
+              <div className="flex flex-col justify-center items-center py-2">
+                <div className="flex items-center mb-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-yellow-500 mr-2"></div>
+                  <p className="text-yellow-400 text-sm font-medium">Looking for match</p>
+                </div>
+                <p className="text-gray-400 text-xs text-center mb-3">
+                  Your funds are waiting to be matched with another user
+                </p>
+                <button 
+                  onClick={() => handleWithdraw(deposit)}
+                  className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 text-sm rounded-lg transition-colors">
+                  Cancel
+                </button>
+              </div>
+            ) : deposit.completed ? (
+              <div className="flex flex-col">
+                <div className="flex justify-center mb-2">
+                  <p className={`text-sm font-medium ${deposit.cancelReason ? "text-red-400" : "text-green-400"}`}>
+                    {deposit.cancelReason ? "Canceled: " + deposit.cancelReason : "Transaction completed"}
+                  </p>
+                </div>
+                <p className="text-gray-400 text-xs text-center">
+                  {deposit.cancelReason 
+                    ? "This deposit was canceled before completion" 
+                    : "This deposit has been fully processed and withdrawn"}
+                </p>
+              </div>
+            ) : isWithdrawable ? (
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-green-400 text-sm font-medium">Lock period ended</p>
+                  <p className="text-gray-400 text-xs mt-1">
+                    Your funds and rewards are ready to withdraw
+                  </p>
+                </div>
+                <button 
+                  onClick={() => handleWithdraw(deposit)}
+                  className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-sm rounded-lg transition-colors">
+                  Withdraw
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center">
+                <p className="text-blue-400 text-sm font-medium">Lock time remaining</p>
+                <div className="mt-2 px-5 py-2 rounded-md bg-black/70 border border-blue-900/40">
+                  <p className="text-white font-mono font-medium text-center">
+                    {formatTimeLeft(timeLeft[deposit.depositId] || 0)}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <div className="relative min-h-screen">
       <div className="fixed inset-0 z-0">
@@ -181,16 +384,40 @@ function Holdings() {
         <DashNav />
         
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-          <div className="mb-8">
+          <div className="mb-6">
             <h1 className="text-3xl font-bold text-white">My Holdings</h1>
             <p className="text-gray-400 mt-2">Manage your active deposits and liquidity positions</p>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex border-b border-blue-900/50 mb-6">
+            <button
+              className={`py-3 px-6 text-sm font-medium ${
+                activeTab === 'active'
+                  ? 'text-blue-400 border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+              onClick={() => setActiveTab('active')}
+            >
+              Active Deposits
+            </button>
+            <button
+              className={`py-3 px-6 text-sm font-medium ${
+                activeTab === 'completed'
+                  ? 'text-blue-400 border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+              onClick={() => setActiveTab('completed')}
+            >
+              Completed Transactions
+            </button>
           </div>
           
           {loading ? (
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
-          ) : deposits.length === 0 ? (
+          ) : activeTab === 'active' && sortedActiveDeposits.length === 0 ? (
             <div className="bg-black/50 border border-blue-800/50 rounded-lg p-10 text-center">
               <h2 className="text-xl text-gray-300 mb-4">No active deposits</h2>
               <p className="text-gray-400 mb-6">You don't have any active liquidity positions</p>
@@ -201,138 +428,16 @@ function Holdings() {
                 </span>
               </a>
             </div>
+          ) : activeTab === 'completed' && sortedCompletedDeposits.length === 0 ? (
+            <div className="bg-black/50 border border-blue-800/50 rounded-lg p-10 text-center">
+              <h2 className="text-xl text-gray-300 mb-4">No completed transactions</h2>
+              <p className="text-gray-400 mb-6">You don't have any completed transactions yet</p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {deposits.map((deposit) => {
-                const isWithdrawable = deposit.matched && (timeLeft[deposit.depositId] || 0) === 0;
-                const isMatched = deposit.matched;
-                
-                return (
-                  <motion.div
-                    key={deposit.depositId}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="bg-black/50 border border-blue-800/50 rounded-lg overflow-hidden hover:border-blue-500/60 transition-all shadow-lg"
-                  >
-                    {/* Header with pool name and status */}
-                    <div className="bg-gradient-to-r from-blue-900/40 to-purple-900/40 p-4 flex justify-between items-center border-b border-blue-900/30">
-                      <h3 className="text-xl font-bold text-white">
-                        {deposit.pool.tokenA}/{deposit.pool.tokenB}
-                      </h3>
-                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        isWithdrawable 
-                          ? "bg-green-500/20 text-green-300" 
-                          : isMatched
-                            ? "bg-blue-500/20 text-blue-300"
-                            : "bg-yellow-500/20 text-yellow-300"
-                      }`}>
-                        {isWithdrawable 
-                          ? "Ready to Withdraw" 
-                          : isMatched
-                            ? "Matched & Locked"
-                            : "Awaiting Match"}
-                      </div>
-                    </div>
-                    
-                    {/* Deposit details */}
-                    <div className="p-4">
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                        <div>
-                          <div className="text-sm text-gray-400">Your Deposit</div>
-                          <div className="font-medium text-white">
-                            {deposit.amount} {deposit.token === 'volatile' ? deposit.pool.tokenA : deposit.pool.tokenB}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-sm text-gray-400">APR</div>
-                          <div className="font-medium text-white">{deposit.pool.apr}</div>
-                        </div>
-                        
-                        {isMatched && (
-                          <>
-                            <div>
-                              <div className="text-sm text-gray-400">Matched With</div>
-                              <div className="font-medium text-white">
-                                {deposit.matchedWith?.amount} {deposit.token === 'volatile' ? deposit.pool.tokenB : deposit.pool.tokenA}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-sm text-gray-400">LP Tokens</div>
-                              <div className="font-medium text-white">{deposit.liquidityTokens?.toFixed(2)}</div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      
-                      {/* State display */}
-                      <div className="mt-5 pt-4 border-t border-blue-900/30">
-                        {!isMatched ? (
-                          <div className="bg-blue-900/20 p-4 rounded-lg">
-                            <div className="flex items-center justify-center">
-                              <div className="animate-pulse mr-2 h-2 w-2 bg-yellow-400 rounded-full"></div>
-                              <div className="animate-pulse mx-1 h-2 w-2 bg-yellow-400 rounded-full" style={{ animationDelay: "0.2s" }}></div>
-                              <div className="animate-pulse ml-2 h-2 w-2 bg-yellow-400 rounded-full" style={{ animationDelay: "0.4s" }}></div>
-                              <span className="ml-3 text-yellow-300">Awaiting match with another user</span>
-                            </div>
-                            
-                            <div className="mt-4 text-center">
-                              <button 
-                                className="relative inline-flex h-10 overflow-hidden rounded-full p-[1px] focus:outline-none"
-                                onClick={() => handleWithdraw(deposit)}
-                              >
-                                <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#FBBF24_0%,#D97706_50%,#FBBF24_100%)]" />
-                                <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950 px-6 py-1 text-sm font-medium text-white backdrop-blur-3xl">
-                                  Cancel Deposit
-                                </span>
-                              </button>
-                            </div>
-                          </div>
-                        ) : isWithdrawable ? (
-                          <div className="bg-green-900/20 border border-green-800/50 p-4 rounded-lg">
-                            <div className="text-center mb-4">
-                              <div className="text-green-300 font-medium">Your deposit is now available for withdrawal!</div>
-                              <div className="text-gray-400 mt-1 text-sm">
-                                Estimated returns: {(deposit.amount * 0.15).toFixed(4)} {deposit.token === 'volatile' ? deposit.pool.tokenA : deposit.pool.tokenB}
-                              </div>
-                            </div>
-                            
-                            <button 
-                              className="w-full relative inline-flex h-12 overflow-hidden rounded-full p-[1px] focus:outline-none"
-                              onClick={() => handleWithdraw(deposit)}
-                            >
-                              <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#10B981_0%,#065F46_50%,#10B981_100%)]" />
-                              <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950 px-6 py-1 text-base font-medium text-white backdrop-blur-3xl">
-                                Withdraw Funds
-                              </span>
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="bg-blue-900/20 border border-blue-800/50 p-4 rounded-lg">
-                            <div className="text-center mb-3">
-                              <div className="text-blue-300 font-medium">Your deposit is matched and earning rewards</div>
-                            </div>
-                            
-                            <div className="flex justify-between items-center bg-blue-900/30 rounded-lg p-3">
-                              <div className="text-gray-300">Time until withdrawal:</div>
-                              <div className="text-white font-mono text-lg">{formatTimeLeft(timeLeft[deposit.depositId] || 0)}</div>
-                            </div>
-                            
-                            <div className="w-full bg-gray-700 h-1.5 rounded-full mt-4">
-                              <div 
-                                className="bg-blue-500 h-1.5 rounded-full" 
-                                style={{ 
-                                  width: `${100 - ((timeLeft[deposit.depositId] || 0) / (24 * 60 * 60 * 1000)) * 100}%` 
-                                }}
-                              ></div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
+              {activeTab === 'active'
+                ? sortedActiveDeposits.map(renderDepositCard)
+                : sortedCompletedDeposits.map(renderDepositCard)}
             </div>
           )}
         </div>
