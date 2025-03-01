@@ -1,50 +1,28 @@
-# React + TypeScript + Vite
+# Cosmos Pool
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Welcome to Cosmos Pool! This project aims to solve one of the key obstacles in Concentrated Liquidity Market Makers (CLMMs): the requirement for users to provide liquidity with tokens on both sides of a trading pair within a specific price range. Our solution enables single-token deposits by matching users with complementary liquidity providers, potentially offering higher percentage gains compared to traditional Constant Function Market Makers (CFMMs) while managing risks akin to single-sided CFMMs.
 
-Currently, two official plugins are available:
+# Cosmos Pool Liquidity Matching Mechanism:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Users deposit a single token (e.g., USDC or WETH) into a smart contract.
+The system matches users with complementary providers (e.g., a USDC depositor with a WETH depositor).
+Using the Uniswap L3 Formula for liquidity matching and calculate the liquidity.
+We then deposit the tokens in the Uniswap liquidity pool. 
+Rewards are distributed via a fixed ratio (e.g., 60/40 favoring the volatile token provider).
 
-## Expanding the ESLint configuration
+# Repository Structure
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+LiquidityMatching.sol: Core smart contract for liquidity matching and CLMM integration. \
+lp-provision-testing.py: Python script for testing contract deployment, deposits, matching, and withdrawals.  \
+main.py: Basic script for interacting with the local node and displaying balances. 
 
-- Configure the top-level `parserOptions` property like this:
+**LiquidityMatching.sol**
+The core smart contract that handles token deposits, liquidity matching, and reward distribution. Key functions include: \
+depositUSDC(uint256 amount): Allows users to deposit USDC. \
+depositWETH(uint256 amount): Allows users to deposit WETH. \
+triggerLiquidityMatching(uint256 amountUSDC, uint256 amountWETH): Triggers the liquidity matching process. \
+withdrawAndDistribute(): Withdraws funds from the pool and distributes rewards to users.
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+**MockNonfungiblePositionManager.sol**
+A mock contract used for testing the liquidity provision process. It simulates the behavior of a Uniswap V3 Nonfungible Position Manager.
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
-
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
-
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
