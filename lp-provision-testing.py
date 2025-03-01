@@ -31,8 +31,8 @@ print("✅ Connected to Hardhat node.")
 
 accounts = w3.eth.accounts
 owner = accounts[0]
-user_usdc = accounts[1]
-user_weth = accounts[2]
+user_usdc = accounts[2]
+user_weth = accounts[1]
 
 #############################
 # 2) Core Price Functions
@@ -123,20 +123,20 @@ def compile_and_deploy_liquidity(mock_pm_address):
 def deposit_tokens(contract, token_type, user, amount):
     token_address = WETH_ADDRESS if token_type == "WETH" else USDC_ADDRESS
     abi = json.loads("""[{
-        "constant":false,
-        "inputs":[{"name":"spender","type":"address"},{"name":"value","type":"uint256"}],
-        "name":"approve",
-        "outputs":[{"name":"","type":"bool"}],
-        "type":"function"
+        "constant": false,
+        "inputs": [{"name": "spender", "type": "address"}, {"name": "value", "type": "uint256"}],
+        "name": "approve",
+        "outputs": [{"name": "", "type": "bool"}],
+        "type": "function"
     }]""")
     token = w3.eth.contract(address=token_address, abi=abi)
     decimals = 18 if token_type == "WETH" else 6
     amount_wei = int(amount * (10 ** decimals))
     token.functions.approve(contract.address, amount_wei).transact({"from": user, "gas": 100000})
     if token_type == "WETH":
-        contract.functions.depositWETH(amount_wei).transact({"from": user, "gas": 200000})
+        contract.functions.depositWETH(amount_wei).transact({"from": user, "gas": 2000000})
     else:
-        contract.functions.depositUSDC(amount_wei).transact({"from": user, "gas": 200000})
+        contract.functions.depositUSDC(amount_wei).transact({"from": user, "gas": 2000000})
     print(f"✅ Deposited {amount} {token_type} from {user}")
 
 def calculate_matched_amounts(contract):
@@ -168,14 +168,13 @@ def execute_liquidity_matching(contract):
     print(f"Matched wETH: {matched_weth}")
     weth_wei = int(Decimal(str(matched_weth)) * Decimal("1e18"))
     usdc_wei = int(Decimal(str(matched_usdc)) * Decimal("1e6"))
-    print(weth_wei, usdc_wei)
+    print("Amounts (in wei):", weth_wei, usdc_wei)
     tx_hash = contract.functions.triggerLiquidityMatching(
         usdc_wei,
         weth_wei
     ).transact({"from": owner, "gas": 500000})
     w3.eth.wait_for_transaction_receipt(tx_hash)
     fetch_events(contract)
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
     print(f"✅ Liquidity matched in tx: {tx_hash.hex()}")
 
 def fetch_events(contract):
@@ -193,17 +192,27 @@ def fetch_events(contract):
     except Exception as e:
         print("Error fetching MatchingTriggered events:", e)
 
+def withdraw_and_distribute(contract):
+    # Simulate the passing of 10 minutes using Hardhat's evm_increaseTime and evm_mine methods.
+    print("⏳ Advancing time by 10 minutes...")
+    w3.provider.make_request("evm_increaseTime", [600])
+    w3.provider.make_request("evm_mine", [])
+    print("⏰ Time advanced. Calling withdrawAndDistribute()...")
+    tx_hash = contract.functions.withdrawAndDistribute().transact({"from": owner, "gas": 500000})
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+    print(f"✅ withdrawAndDistribute executed in tx: {tx_hash.hex()}")
+
 def main():
     mock_pm_address = compile_and_deploy_mock()
     contract = compile_and_deploy_liquidity(mock_pm_address)
     print(f"📜 LiquidityMatching contract deployed at: {contract.address}")
     deposit_tokens(contract, "WETH", user_weth, 0.2)
-    deposit_tokens(contract, "USDC", user_usdc, 10)
-    # Pool check code omitted for brevity; assume pool is deployed/initialized.
+    deposit_tokens(contract, "USDC", user_usdc, 5)
     execute_liquidity_matching(contract)
+    withdraw_and_distribute(contract)
     final_weth = contract.functions.totalWETHDeposited().call() / 1e18
     final_usdc = contract.functions.totalUSDCDeposited().call() / 1e6
-    print(f"\n🏁 Final Holdings: {final_weth:.4f} WETH | {final_usdc:.2f} USDC")
+    print(f"\n🏁 Final Holdings after withdrawAndDistribute: {final_weth:.4f} WETH | {final_usdc:.2f} USDC")
 
 if __name__ == "__main__":
     main()
