@@ -59,23 +59,20 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     if (window.ethereum) {
       const handleAccountsChanged = (accounts: string[]) => {
         if (accounts.length === 0) {
-          // User disconnected their wallet
           setIsConnected(false);
           setAddress(null);
           localStorage.removeItem('walletAddress');
         } else {
-          // Account changed
           setAddress(accounts[0]);
           setIsConnected(true);
           localStorage.setItem('walletAddress', accounts[0]);
         }
       };
 
-      // Use addListener instead of on/removeListener
-      window.ethereum.addListener('accountsChanged', handleAccountsChanged);
+      // Use on instead of addListener
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
       
       return () => {
-        // Check if ethereum object still exists before removing listener
         if (window.ethereum?.removeListener) {
           window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
         }

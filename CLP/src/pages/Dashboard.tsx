@@ -3,7 +3,6 @@ import DashNav from "../components/DashNav";
 import SpaceBackground from '../components/backgrounds/spaceBg';
 import AddLiquidityModal from '../components/AddLiquidityModal';
 import { motion } from 'framer-motion';
-import React from "react";
 import { useNotification } from "../context/NotificationContext";
 import { useWallet } from '../context/WalletContext';
 
