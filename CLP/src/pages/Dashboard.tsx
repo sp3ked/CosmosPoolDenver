@@ -5,6 +5,7 @@ import AddLiquidityModal from '../components/AddLiquidityModal';
 import { motion } from 'framer-motion';
 import { useNotification } from "../context/NotificationContext";
 import { useWallet } from '../context/WalletContext';
+import { useNavigate } from 'react-router-dom';
 
 interface Pool {
   id: string;
@@ -184,6 +185,11 @@ function Dashboard() {
   const { showNotification } = useNotification();
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const { isConnected, connect } = useWallet();
+  const navigate = useNavigate();
+
+  const navigateToHome = () => {
+    navigate('/');
+  };
 
   // Function to check wallet connection before opening AddLiquidityModal
   const handleJoinPool = (pool: Pool) => {

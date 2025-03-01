@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface Star {
   angle: number;
@@ -28,19 +28,36 @@ interface ColorScheme {
 
 const SpaceBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  
+  useEffect(() => {
+    const updateDimensions = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    
+    return () => {
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, []);
   
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return; // Early return if canvas is null
+    if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
-    if (!ctx) return; // Early return if context is null
+    if (!ctx) return;
+    
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
     
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
-    
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
     
     const stars: Star[] = [];
     const nebulae: Nebula[] = [];
@@ -49,7 +66,6 @@ const SpaceBackground: React.FC = () => {
     
     const colors: ColorScheme = {
       stars: ['#ffffff', '#f8f8ff', '#fffafa', '#f0ffff', '#f5f5f5'],
-    //   shootingStars: ['#89cff0', '#add8e6', '#87ceeb', '#00bfff', '#ffffff'],
       nebulae: ['#663399', '#9370db', '#8a2be2', '#9932cc', '#ba55d3', '#800080']
     };
     
@@ -57,14 +73,9 @@ const SpaceBackground: React.FC = () => {
       const centerX = canvasWidth / 2;
       const centerY = canvasHeight / 2;
       
-      // Use a more uniform distribution strategy
-      // Divide canvas into a grid and place stars more evenly
-      
-      // Get a random position across the entire canvas
       let x = Math.random() * canvasWidth;
       let y = Math.random() * canvasHeight;
       
-      // Calculate angle and distance from center for rotation
       const angle = Math.atan2(y - centerY, x - centerX);
       const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
       
@@ -73,10 +84,10 @@ const SpaceBackground: React.FC = () => {
         distance: distance,
         x: x,
         y: y,
-        size: Math.random() * 2.5, // Slightly smaller stars
+        size: Math.random() * 2.5,
         color: colors.stars[Math.floor(Math.random() * colors.stars.length)],
-        opacity: 0.15 + Math.random() * 0.2, // Even lower opacity range (0.15-0.35)
-        rotationSpeed: 0.0001 + Math.random() * 0.0002 // Slower rotation
+        opacity: 0.15 + Math.random() * 0.2,
+        rotationSpeed: 0.0001 + Math.random() * 0.0002
       };
     }
     
@@ -93,21 +104,16 @@ const SpaceBackground: React.FC = () => {
       };
     }
     
-    // Create stars with better distribution
-    const gridSize = 20; // Size of each grid cell
+    const gridSize = 20;
     const gridCols = Math.ceil(canvasWidth / gridSize);
     const gridRows = Math.ceil(canvasHeight / gridSize);
     
-    // Add some stars in a grid pattern for more even distribution
     for (let row = 0; row < gridRows; row++) {
       for (let col = 0; col < gridCols; col++) {
-        // Only place a star in some cells (for randomness)
         if (Math.random() < 0.3) {
-          // Get position within this grid cell plus some random offset
           const x = col * gridSize + Math.random() * gridSize;
           const y = row * gridSize + Math.random() * gridSize;
           
-          // Calculate distance and angle from center
           const centerX = canvasWidth / 2;
           const centerY = canvasHeight / 2;
           const angle = Math.atan2(y - centerY, x - centerX);
@@ -118,16 +124,15 @@ const SpaceBackground: React.FC = () => {
             distance: distance,
             x: x,
             y: y,
-            size: Math.random() * 2.5, // Smaller stars
+            size: Math.random() * 2.5,
             color: colors.stars[Math.floor(Math.random() * colors.stars.length)],
-            opacity: 0.15 + Math.random() * 0.2, // Even lower opacity
-            rotationSpeed: 0.0001 + Math.random() * 0.0002 // Slower rotation
+            opacity: 0.15 + Math.random() * 0.2,
+            rotationSpeed: 0.0001 + Math.random() * 0.0002
           });
         }
       }
     }
     
-    // Add remaining stars randomly to reach maxStars
     while (stars.length < maxStars) {
       stars.push(createStar());
     }
@@ -172,7 +177,6 @@ const SpaceBackground: React.FC = () => {
       for (let i = 0; i < stars.length; i++) {
         const star = stars[i];
         
-        // Update star position for rotation
         star.angle += star.rotationSpeed;
         star.x = centerX + Math.cos(star.angle) * star.distance;
         star.y = centerY + Math.sin(star.angle) * star.distance;
@@ -181,7 +185,6 @@ const SpaceBackground: React.FC = () => {
         ctx.globalAlpha = star.opacity;
         
         if (star.size > 1.8) {
-          // Draw a 4-point star for larger stars
           const spikes = 4;
           const outerRadius = star.size;
           const innerRadius = star.size / 2;
@@ -207,7 +210,6 @@ const SpaceBackground: React.FC = () => {
           ctx.closePath();
           ctx.fill();
         } else {
-          // Simple circle for smaller stars
           ctx.beginPath();
           ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
           ctx.fill();
@@ -216,52 +218,36 @@ const SpaceBackground: React.FC = () => {
       ctx.globalAlpha = 1;
     }
     
+    let animationFrameId: number;
+    
     function draw(): void {
       if (!ctx) return;
       ctx.clearRect(0, 0, canvasWidth, canvasHeight);
       
-      // Space background with gradient
       const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
-      gradient.addColorStop(0, '#050510'); // Darker background
-      gradient.addColorStop(1, '#10102a'); // Darker background
+      gradient.addColorStop(0, '#050510');
+      gradient.addColorStop(1, '#10102a');
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
       
       drawNebulae();
       drawStars();
       
-      requestAnimationFrame(draw);
+      animationFrameId = requestAnimationFrame(draw);
     }
     
-    const resizeHandler = (): void => {
-      if (!canvas) return;
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      
-      // Recalculate star positions for new canvas size
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      
-      for (let i = 0; i < stars.length; i++) {
-        const star = stars[i];
-        star.x = centerX + Math.cos(star.angle) * star.distance;
-        star.y = centerY + Math.sin(star.angle) * star.distance;
-      }
-    };
-    
-    window.addEventListener('resize', resizeHandler);
     draw();
     
     return () => {
-      window.removeEventListener('resize', resizeHandler);
+      cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [dimensions]);
   
   return (
     <div className="fixed inset-0 w-full h-full overflow-hidden bg-gray-900">
       <canvas 
         ref={canvasRef} 
-        className="absolute top-0 left-0 w-full h-full"
+        style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
       />
       <div className="relative z-10 w-full h-full">
         {/* Your content goes here */}
