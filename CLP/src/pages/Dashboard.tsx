@@ -185,11 +185,7 @@ function Dashboard() {
   const { showNotification } = useNotification();
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const { isConnected, connect } = useWallet();
-  const navigate = useNavigate();
 
-  const navigateToHome = () => {
-    navigate('/');
-  };
 
   // Function to check wallet connection before opening AddLiquidityModal
   const handleJoinPool = (pool: Pool) => {
