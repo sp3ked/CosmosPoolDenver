@@ -25,6 +25,33 @@ interface Deposit {
   cancelReason?: string; // Added to indicate why a deposit was canceled or completed early
 }
 
+// Add new interface for active liquidity positions
+interface ActivePosition {
+  id: string;
+  pool: {
+    tokenA: string;
+    tokenB: string;
+    apr: string;
+    tvl: string;
+  };
+  share: string;
+  deposited: {
+    tokenA: string;
+    tokenB: string;
+    usdValue: string;
+  };
+  earnings: {
+    total: string;
+    daily: string;
+    weekly: string;
+    projected: {
+      monthly: string;
+      yearly: string;
+    };
+  };
+  startDate: number;
+}
+
 function Holdings() {
   const { showNotification } = useNotification();
   const [deposits, setDeposits] = useState<Deposit[]>([]);
@@ -33,6 +60,7 @@ function Holdings() {
   const [selectedDeposit, setSelectedDeposit] = useState<Deposit | null>(null);
   const [timeLeft, setTimeLeft] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [activePositions, setActivePositions] = useState<ActivePosition[]>([]);
 
   // Mock data to simulate user's deposits
   useEffect(() => {
@@ -121,8 +149,39 @@ function Holdings() {
       }
     ];
 
+    // Mock data for active positions - only keeping ETH/USDC 
+    const mockActivePositions: ActivePosition[] = [
+      {
+        id: "pos-1",
+        pool: {
+          tokenA: "ETH",
+          tokenB: "USDC",
+          apr: "12.4%",
+          tvl: "$5.2M"
+        },
+        share: "0.15%",
+        deposited: {
+          tokenA: "0.5 ETH",
+          tokenB: "1,000 USDC",
+          usdValue: "$2,000"
+        },
+        earnings: {
+          total: "$47.82",
+          daily: "$1.85",
+          weekly: "$12.95",
+          projected: {
+            monthly: "$55.50",
+            yearly: "$675.25"
+          }
+        },
+        startDate: Date.now() - (15 * 24 * 60 * 60 * 1000) // 15 days ago
+      }
+      // BTC/USDC position removed
+    ];
+
     setTimeout(() => {
       setDeposits(mockDeposits);
+      setActivePositions(mockActivePositions);
       setLoading(false);
     }, 1000);
   }, []);
@@ -179,6 +238,15 @@ function Holdings() {
       minutes.toString().padStart(2, '0'),
       seconds.toString().padStart(2, '0'),
     ].join(':');
+  };
+
+  // Format date
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   // Handle withdrawal with notifications
@@ -327,7 +395,7 @@ function Holdings() {
                 </p>
                 <button 
                   onClick={() => handleWithdraw(deposit)}
-                  className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 text-sm rounded-lg transition-colors">
+                  className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 text-sm rounded-lg transition-colors cursor-pointer">
                   Cancel
                 </button>
               </div>
@@ -354,7 +422,7 @@ function Holdings() {
                 </div>
                 <button 
                   onClick={() => handleWithdraw(deposit)}
-                  className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-sm rounded-lg transition-colors">
+                  className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 text-sm rounded-lg transition-colors cursor-pointer">
                   Withdraw
                 </button>
               </div>
@@ -368,6 +436,97 @@ function Holdings() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  // Render active positions
+  const renderActivePosition = (position: ActivePosition) => {
+    return (
+      <motion.div
+        key={position.id}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="bg-black/50 border border-blue-800/50 rounded-lg overflow-hidden hover:border-blue-500/60 transition-all shadow-lg"
+      >
+        {/* Header with pool name and APR */}
+        <div className="bg-gradient-to-r from-blue-900/40 to-purple-900/40 p-4 flex justify-between items-center border-b border-blue-900/30">
+          <div className="flex items-center">
+            <h3 className="text-xl font-bold text-white">
+              {position.pool.tokenA}/{position.pool.tokenB}
+            </h3>
+            <span className="ml-3 text-sm text-blue-300">
+              Share: {position.share}
+            </span>
+          </div>
+          <span className="bg-green-600/20 text-green-300 px-3 py-1 rounded-full text-sm font-medium">
+            {position.pool.apr} APR
+          </span>
+        </div>
+
+        <div className="p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            {/* Your Position */}
+            <div className="bg-black/40 rounded-lg p-3 border border-blue-900/30">
+              <h4 className="text-sm text-gray-400 mb-2">Your Position</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-white text-sm">{position.deposited.tokenA}</p>
+                  <p className="text-white text-sm">{position.deposited.tokenB}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-blue-400 font-medium">{position.deposited.usdValue}</p>
+                  <p className="text-xs text-gray-500">Since {formatDate(position.startDate)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Earnings Info */}
+            <div className="bg-black/40 rounded-lg p-3 border border-blue-900/30">
+              <h4 className="text-sm text-gray-400 mb-2">Earnings</h4>
+              <div className="flex flex-col">
+                <div className="flex justify-between mb-1">
+                  <span className="text-white text-sm">Total earned</span>
+                  <span className="text-green-400 font-medium">{position.earnings.total}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white text-sm">Daily rate</span>
+                  <span className="text-green-400">+{position.earnings.daily}</span>
+                </div>
+              </div>
+              <div className="mt-2 relative w-full h-1 bg-gray-700 rounded-full overflow-hidden">
+                <div className="absolute h-full bg-gradient-to-r from-green-500 to-blue-500 rounded-full w-full animate-shimmer"></div>
+              </div>
+              <p className="text-xs text-green-400/70 mt-1 text-right">Earning fees in real-time</p>
+            </div>
+
+            {/* Projected Returns */}
+            <div className="bg-black/40 rounded-lg p-3 border border-blue-900/30">
+              <h4 className="text-sm text-gray-400 mb-2">Projected Returns</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col">
+                  <span className="text-gray-400 text-xs">Monthly</span>
+                  <span className="text-white">~{position.earnings.projected.monthly}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-400 text-xs">Yearly</span>
+                  <span className="text-white">~{position.earnings.projected.yearly}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Updated Actions Row - simplified buttons with matching styles */}
+          <div className="flex justify-end gap-4 mt-4">
+            <button className="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-sm rounded-lg transition-colors cursor-pointer">
+              Add Liquidity
+            </button>
+            <button className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 text-sm rounded-lg transition-colors cursor-pointer">
+              Withdraw & Claim
+            </button>
           </div>
         </div>
       </motion.div>
@@ -417,27 +576,53 @@ function Holdings() {
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
-          ) : activeTab === 'active' && sortedActiveDeposits.length === 0 ? (
-            <div className="bg-black/50 border border-blue-800/50 rounded-lg p-10 text-center">
-              <h2 className="text-xl text-gray-300 mb-4">No active deposits</h2>
-              <p className="text-gray-400 mb-6">You don't have any active liquidity positions</p>
-              <a href="/dashboard" className="relative inline-flex h-10 overflow-hidden rounded-full p-[1px]">
-                <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#3B82F6_0%,#1E40AF_50%,#3B82F6_100%)]" />
-                <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950 px-6 py-1 text-sm font-medium text-white backdrop-blur-3xl">
-                  Explore Pools
-                </span>
-              </a>
-            </div>
-          ) : activeTab === 'completed' && sortedCompletedDeposits.length === 0 ? (
-            <div className="bg-black/50 border border-blue-800/50 rounded-lg p-10 text-center">
-              <h2 className="text-xl text-gray-300 mb-4">No completed transactions</h2>
-              <p className="text-gray-400 mb-6">You don't have any completed transactions yet</p>
+          ) : activeTab === 'active' ? (
+            <div className="space-y-8">
+              {/* Active Liquidity Positions Section */}
+              {activePositions.length > 0 && (
+                <div>
+                  <h2 className="text-xl font-semibold text-blue-400 mb-4">Active Liquidity Positions</h2>
+                  <div className="grid grid-cols-1 gap-6">
+                    {activePositions.map(renderActivePosition)}
+                  </div>
+                </div>
+              )}
+              
+              {/* Active Deposits Section */}
+              {sortedActiveDeposits.length > 0 && (
+                <div>
+                  <h2 className="text-xl font-semibold text-blue-400 mb-4">Active Deposits</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {sortedActiveDeposits.map(renderDepositCard)}
+                  </div>
+                </div>
+              )}
+              
+              {/* Empty state when both are 0 */}
+              {activePositions.length === 0 && sortedActiveDeposits.length === 0 && (
+                <div className="bg-black/50 border border-blue-800/50 rounded-lg p-10 text-center">
+                  <h2 className="text-xl text-gray-300 mb-4">No active positions</h2>
+                  <p className="text-gray-400 mb-6">You don't have any active liquidity positions or deposits</p>
+                  <a href="/dashboard" className="relative inline-flex h-10 overflow-hidden rounded-full p-[1px]">
+                    <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#3B82F6_0%,#1E40AF_50%,#3B82F6_100%)]" />
+                    <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950 px-6 py-1 text-sm font-medium text-white backdrop-blur-3xl">
+                      Explore Pools
+                    </span>
+                  </a>
+                </div>
+              )}
             </div>
           ) : (
+            // Completed transactions tab (remains unchanged)
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {activeTab === 'active'
-                ? sortedActiveDeposits.map(renderDepositCard)
-                : sortedCompletedDeposits.map(renderDepositCard)}
+              {sortedCompletedDeposits.length === 0 ? (
+                <div className="bg-black/50 border border-blue-800/50 rounded-lg p-10 text-center md:col-span-2">
+                  <h2 className="text-xl text-gray-300 mb-4">No completed transactions</h2>
+                  <p className="text-gray-400 mb-6">You don't have any completed transactions yet</p>
+                </div>
+              ) : (
+                sortedCompletedDeposits.map(renderDepositCard)
+              )}
             </div>
           )}
         </div>
@@ -477,13 +662,13 @@ function Holdings() {
             <div className="flex space-x-4 justify-end">
               <button 
                 onClick={() => setWithdrawModalOpen(false)}
-                className="px-4 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-800"
+                className="px-4 py-2 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-800 cursor-pointer"
               >
                 Cancel
               </button>
               <button 
                 onClick={confirmWithdraw}
-                className="relative inline-flex h-10 overflow-hidden rounded-lg p-[1px] focus:outline-none"
+                className="relative inline-flex h-10 overflow-hidden rounded-lg p-[1px] focus:outline-none cursor-pointer"
               >
                 <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#3B82F6_0%,#1E40AF_50%,#3B82F6_100%)]" />
                 <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-lg bg-slate-950 px-4 py-1 text-sm font-medium text-white backdrop-blur-3xl">
