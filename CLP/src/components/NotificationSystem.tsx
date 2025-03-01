@@ -40,7 +40,7 @@ const NotificationItem: React.FC<{
   const { type, message, title, autoClose = true, duration = 5000 } = notification;
   
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (autoClose) {
       timer = setTimeout(() => {
         onClose();
