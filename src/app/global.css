@@ -1,0 +1,12 @@
+@font-face {
+  font-family: 'FragileBombers';
+  src: url('../assets/fonts/FragileBombers.ttf') format('truetype'); /* or .woff, .woff2 */
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  font-family: 'FragileBombers', sans-serif;
+}
+
+/* ...existing styles... */

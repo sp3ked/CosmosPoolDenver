@@ -1,0 +1,17 @@
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #111827;  /* Dark background */
+}
+
+::-webkit-scrollbar-thumb {
+    background: #2563eb;  /* Blue color */
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #1d4ed8;  /* Darker blue on hover */
+}

@@ -1,0 +1,1 @@
+{"version":3,"file":"selfdestruct.d.ts","sourceRoot":"","sources":["../../../src/opcodes/selfdestruct.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,IAAI,EAAE,MAAM,UAAU,CAAC;AAGhC,MAAM,WAAW,YAAY;IAC3B,WAAW,EAAE,MAAM,CAAC;CACrB;AAED,iBAAe,MAAM,CAAC,IAAI,EAAE,IAAI,CAAC,YAAY,CAAC,GAAG,OAAO,CAAC,MAAM,CAAC,CAI/D;;;;AAED,wBAA0B"}

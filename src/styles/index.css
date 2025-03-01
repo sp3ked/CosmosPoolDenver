@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap');
+
+/* In src/styles/scrollbar.css */
+@layer utilities {
+    .scrollbar-custom {
+      scrollbar-width: thin;
+      scrollbar-color: #4B5563 #1F2937;
+    }
+  
+    .scrollbar-custom::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+  
+    .scrollbar-custom::-webkit-scrollbar-track {
+      background: #1F2937;
+      border-radius: 4px;
+    }
+  
+    .scrollbar-custom::-webkit-scrollbar-thumb {
+      background-color: #4B5563;
+      border-radius: 4px;
+    }
+  
+    .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+      background-color: #6B7280;
+    }
+}
+
+/* Add these responsive animation classes to your existing CSS file */
+@media (max-width: 640px) {
+  .animation-container-mobile {
+    transform: scale(0.8);
+  }
+  
+  .button-container-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 641px) {
+  .button-container-desktop {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+  }
+}

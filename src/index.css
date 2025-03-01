@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Add smooth scrolling to the entire document */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Fix for full-height hero section with fixed nav */
+body {
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  /* Custom keyframes and animations */
+  @keyframes sweep {
+    0% {
+      transform: translateX(-100%) skewX(-15deg);
+    }
+    100% {
+      transform: translateX(400%) skewX(-15deg);
+    }
+  }
+  
+  .shimmer-sweep {
+    animation: sweep 2.5s infinite;
+  }
+  
+  .shimmer-sweep-slow {
+    animation: sweep 3.5s infinite;
+  }
+
+  /* Bouncing animation for scroll indicator */
+  @keyframes bounce {
+    0%, 100% {
+      transform: translateY(-25%);
+      animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+    50% {
+      transform: translateY(0);
+      animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
+  }
+  
+  .animate-bounce {
+    animation: bounce 1.5s infinite;
+  }
+}
+
+@import './styles/scrollbar.css';

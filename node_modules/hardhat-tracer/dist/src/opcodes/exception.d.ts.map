@@ -1,0 +1,1 @@
+{"version":3,"file":"exception.d.ts","sourceRoot":"","sources":["../../../src/opcodes/exception.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,IAAI,EAAE,MAAM,UAAU,CAAC;AAGhC,MAAM,WAAW,SAAS;IACxB,IAAI,EAAE,MAAM,CAAC;IACb,KAAK,EAAE,MAAM,CAAC;CACf;AAED,iBAAe,MAAM,CAAC,IAAI,EAAE,IAAI,CAAC,SAAS,CAAC,GAAG,OAAO,CAAC,MAAM,CAAC,CAM5D;;;;AAED,wBAA0B"}

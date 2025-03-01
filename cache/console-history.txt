@@ -1,0 +1,9 @@
+console.log(block);
+const block = await ethers.provider.getBlockNumber();
+console.log(block)
+console.log(block);
+const block = await ethers.provider.getBlockNumber();
+// Should show chainId: 130 (your forked Unichain)
+console.log(network);
+const network = await ethers.provider.getNetwork();
+(await ethers.provider.getNetwork()).chainId
