@@ -5,6 +5,7 @@ import AddLiquidityModal from '../components/AddLiquidityModal';
 import { motion } from 'framer-motion';
 import React from "react";
 import { useNotification } from "../context/NotificationContext";
+import { useWallet } from '../context/WalletContext';
 
 interface Pool {
   id: string;
@@ -183,13 +184,11 @@ const allPools: Pool[] = [
 function Dashboard() {
   const { showNotification } = useNotification();
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+  const { isConnected, connect } = useWallet();
 
   // Function to check wallet connection before opening AddLiquidityModal
   const handleJoinPool = (pool: Pool) => {
-    // Check if wallet is connected
-    const isWalletConnected = window.ethereum && (window.ethereum as any).selectedAddress;
-    
-    if (!isWalletConnected) {
+    if (!isConnected) {
       showNotification(
         "warning",
         "You need to connect your wallet before joining a pool.",
@@ -343,16 +342,33 @@ function Dashboard() {
                       {/* Call to action - New animated border button */}
                       <div className="mt-6 flex justify-center">
                         <button 
-                          onClick={() => !pool.greyedOut && handleJoinPool(pool)}  // Updated to use handleJoinPool
+                          onClick={() => {
+                            if (!pool.greyedOut) {
+                              if (!isConnected) {
+                                connect();
+                              } else {
+                                handleJoinPool(pool);
+                              }
+                            }
+                          }}
                           disabled={pool.greyedOut}
-                          className={`relative inline-flex h-12 overflow-hidden rounded-full p-[1px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-50 ${
-                            pool.greyedOut ? 'cursor-not-allowed opacity-75' : ''
+                          className={`group relative inline-flex h-12 overflow-hidden rounded-full p-[1px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+                            pool.greyedOut ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
                           }`}
                         >
-                          <span className={`absolute inset-[-1000%] ${!pool.greyedOut && 'animate-[spin_2s_linear_infinite]'} bg-[conic-gradient(from_90deg_at_50%_50%,#3B82F6_0%,#1E40AF_50%,#3B82F6_100%)]`} />
+                          <span className={`absolute inset-[-1000%] ${
+                            !pool.greyedOut && 'animate-[spin_2s_linear_infinite] group-hover:animate-[spin_1s_linear_infinite]'
+                          } bg-[conic-gradient(from_90deg_at_50%_50%,#3B82F6_0%,#1E40AF_50%,#3B82F6_100%)]`} />
                           <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950 px-6 py-1 text-sm font-medium text-white backdrop-blur-3xl">
                             {pool.greyedOut ? (
                               "Coming Soon"
+                            ) : !isConnected ? (
+                              <>
+                                <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                Connect Wallet
+                              </>
                             ) : (
                               <>
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -407,12 +423,18 @@ function Dashboard() {
                     <div className="text-right">
                       {pool.available ? (
                         <button 
-                          onClick={() => handleJoinPool(pool)}  // Updated to use handleJoinPool
-                          className="relative inline-flex h-9 overflow-hidden rounded-full p-[1px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-50"
+                          onClick={() => {
+                            if (!isConnected) {
+                              connect();
+                            } else {
+                              handleJoinPool(pool);
+                            }
+                          }}
+                          className={`group relative inline-flex h-9 overflow-hidden rounded-full p-[1px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-50`}
                         >
-                          <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#3B82F6_0%,#1E40AF_50%,#3B82F6_100%)]" />
+                          <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] group-hover:animate-[spin_1.5s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#3B82F6_0%,#1E40AF_50%,#3B82F6_100%)]" />
                           <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-slate-950 px-4 py-1 text-sm font-medium text-white backdrop-blur-3xl">
-                            Join
+                            {isConnected ? 'Join' : 'Connect'}
                           </span>
                         </button>
                       ) : (

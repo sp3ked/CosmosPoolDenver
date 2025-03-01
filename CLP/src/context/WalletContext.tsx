@@ -1,30 +1,52 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import { connectWallet } from '../utils/contract';
 
 interface WalletContextType {
   isConnected: boolean;
   address: string | null;
+  connecting: boolean;
   connect: () => Promise<void>;
   disconnect: () => void;
 }
 
-const WalletContext = createContext<WalletContextType | null>(null);
+const WalletContext = createContext<WalletContextType>({
+  isConnected: false,
+  address: null,
+  connecting: false,
+  connect: async () => {},
+  disconnect: () => {},
+});
 
-export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const [isConnected, setIsConnected] = useState(false);
+export const useWallet = () => useContext(WalletContext);
+
+interface WalletProviderProps {
+  children: ReactNode;
+}
+
+export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [address, setAddress] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState<boolean>(false);
 
-  // Check initial connection status
+  // Check for existing connection on page load
   useEffect(() => {
     const checkConnection = async () => {
-      if (window.ethereum) {
+      // Check if we have a stored address
+      const storedAddress = localStorage.getItem('walletAddress');
+      
+      // If there's a stored address and MetaMask is available, restore the connection
+      if (storedAddress && window.ethereum) {
         try {
           const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts.length > 0) {
+          if (accounts && accounts.length > 0) {
             setAddress(accounts[0]);
             setIsConnected(true);
+          } else {
+            // Clear storage if no accounts found
+            localStorage.removeItem('walletAddress');
           }
         } catch (error) {
-          console.error("Error checking connection:", error);
+          console.error('Failed to restore wallet connection:', error);
         }
       }
     };
@@ -32,63 +54,70 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     checkConnection();
   }, []);
 
-  const connect = async () => {
-    if (!window.ethereum) {
-      throw new Error("MetaMask is not installed");
-    }
-
-    try {
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      setAddress(accounts[0]);
-      setIsConnected(true);
-    } catch (error) {
-      console.error("Failed to connect:", error);
-      throw error;
-    }
-  };
-
-  const disconnect = () => {
-    setAddress(null);
-    setIsConnected(false);
-  };
-
-  // Listen for account and network changes
+  // Listen for account changes - Fixed event handling
   useEffect(() => {
     if (window.ethereum) {
-      window.ethereum.on('accountsChanged', (accounts: string[]) => {
-        if (accounts.length > 0) {
+      const handleAccountsChanged = (accounts: string[]) => {
+        if (accounts.length === 0) {
+          // User disconnected their wallet
+          setIsConnected(false);
+          setAddress(null);
+          localStorage.removeItem('walletAddress');
+        } else {
+          // Account changed
           setAddress(accounts[0]);
           setIsConnected(true);
-        } else {
-          disconnect();
+          localStorage.setItem('walletAddress', accounts[0]);
         }
-      });
+      };
 
-      window.ethereum.on('chainChanged', () => {
-        window.location.reload();
-      });
+      // Use addListener instead of on/removeListener
+      window.ethereum.addListener('accountsChanged', handleAccountsChanged);
+      
+      return () => {
+        // Check if ethereum object still exists before removing listener
+        if (window.ethereum?.removeListener) {
+          window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        }
+      };
     }
-
-    return () => {
-      if (window.ethereum) {
-        window.ethereum.removeAllListeners('accountsChanged');
-        window.ethereum.removeAllListeners('chainChanged');
-      }
-    };
   }, []);
 
+  const connect = async (): Promise<void> => {
+    if (connecting) return;
+    
+    setConnecting(true);
+    try {
+      const result = await connectWallet();
+      if (result && result.address) {
+        setAddress(result.address);
+        setIsConnected(true);
+        localStorage.setItem('walletAddress', result.address);
+      }
+    } catch (error) {
+      console.error('Connection failed:', error);
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const disconnect = (): void => {
+    setIsConnected(false);
+    setAddress(null);
+    localStorage.removeItem('walletAddress');
+  };
+
   return (
-    <WalletContext.Provider value={{ isConnected, address, connect, disconnect }}>
+    <WalletContext.Provider
+      value={{
+        isConnected,
+        address,
+        connecting,
+        connect,
+        disconnect
+      }}
+    >
       {children}
     </WalletContext.Provider>
   );
-}
-
-export function useWallet() {
-  const context = useContext(WalletContext);
-  if (!context) {
-    throw new Error('useWallet must be used within a WalletProvider');
-  }
-  return context;
-}
+};
