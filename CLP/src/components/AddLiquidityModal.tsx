@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNotification } from "../context/NotificationContext";
-import { depositUSDC, depositWETH } from "../utils/contract";
+import { depositUSDC, depositWETH, approveWETH } from "../utils/contract";
 
 interface Pool {
   id: string;
@@ -27,10 +27,8 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
   const [matchProgress, setMatchProgress] = useState(0);
   const [matchStatus, setMatchStatus] = useState("Waiting for match");
 
-  // Check if wallet is connected (you can use any method that works in your app)
   const isWalletConnected = (): boolean => {
-    // Check for wallet connection - can be adapted to your specific wallet implementation
-    return window.ethereum && window.ethereum.selectedAddress ? true : false;
+    return window.ethereum && (window.ethereum as any).selectedAddress ? true : false;
   };
 
   useEffect(() => {
