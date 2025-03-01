@@ -4,6 +4,7 @@ import math
 import requests
 from datetime import datetime
 from decimal import Decimal, getcontext
+from flask import Flask, jsonify
 
 # Increase precision for decimal calculations (if needed)
 getcontext().prec = 100
@@ -18,7 +19,8 @@ def deploy_contracts():
     if "error" in data:
         raise Exception(data["error"])
     print(
-        f"INFO: Contracts deployed. Mock PM at: {data['mock_pm_address']}, LiquidityMatching at: {data['liquidity_contract_address']}")
+        f"INFO: Contracts deployed. Mock PM at: {data['mock_pm_address']}, LiquidityMatching at: {data['liquidity_contract_address']}"
+    )
     return data
 
 
@@ -49,7 +51,9 @@ def execute_liquidity_matching():
     if "error" in data:
         print("ERROR during liquidity matching:", data["error"])
     else:
-        print(f"INFO: Liquidity matching executed. Transaction hash: {data['transaction_hash']}")
+        print(
+            f"INFO: Liquidity matching executed. Transaction hash: {data['transaction_hash']}"
+        )
         print("Events:", json.dumps(data.get("events", {}), indent=2))
     return data
 
@@ -61,7 +65,9 @@ def withdraw_and_distribute():
     if "error" in data:
         print("ERROR during withdrawal:", data["error"])
     else:
-        print(f"INFO: Withdrawal executed. Transaction hash: {data['transaction_hash']}")
+        print(
+            f"INFO: Withdrawal executed. Transaction hash: {data['transaction_hash']}"
+        )
     return data
 
 
