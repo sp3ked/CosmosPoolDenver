@@ -14,7 +14,7 @@ Rewards are distributed via a fixed ratio (e.g., 60/40 favoring the volatile tok
 
 LiquidityMatching.sol: Core smart contract for liquidity matching and CLMM integration. \
 lp-provision-testing.py: Python script for testing contract deployment, deposits, matching, and withdrawals.  \
-main.py: Basic script for interacting with the local node and displaying balances. \
+main.py: Basic script for interacting with the local node and displaying balances. 
 
 **LiquidityMatching.sol**
 The core smart contract that handles token deposits, liquidity matching, and reward distribution. Key functions include:
