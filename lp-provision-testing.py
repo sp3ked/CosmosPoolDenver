@@ -18,7 +18,7 @@ install_solc("0.7.6")
 #############################
 
 CONTRACT_PATH = "liquidityMatching.sol"
-MOCK_CONTRACT_PATH = "MockNonfungiblePositionManager.sol"  # Make sure this file exists.
+MOCK_CONTRACT_PATH = "MockNonfungiblePositionManager.sol"  # Ensure this file exists.
 BASE_PATH = os.path.abspath(".")
 WETH_ADDRESS = "0x4200000000000000000000000000000000000006"
 USDC_ADDRESS = "0x078D782b760474a361dDA0AF3839290b0EF57AD6"
@@ -27,8 +27,8 @@ USDC_ADDRESS = "0x078D782b760474a361dDA0AF3839290b0EF57AD6"
 w3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 if not w3.is_connected():
-    raise Exception("❌ Not connected to local Hardhat node!")
-print("✅ Connected to Hardhat node.")
+    raise Exception("ERROR: Unable to connect to Hardhat local node.")
+print("INFO: Connected to Hardhat local node.")
 
 accounts = w3.eth.accounts
 owner = accounts[0]
@@ -45,7 +45,7 @@ def fetch_weth_price():
     response = requests.get(url, params=params)
     if response.status_code == 200:
         return response.json()["weth"]["usd"]
-    raise Exception(f"Price fetch failed: {response.status_code}")
+    raise Exception(f"ERROR: Price fetch failed with status {response.status_code}")
 
 def get_price_range(base_price, percentage=0.1):
     return (base_price * (1 - percentage), base_price * (1 + percentage))
@@ -61,14 +61,14 @@ def calculate_liquidity(weth_amount=None, usdc_amount=None, price_lower=None, pr
         liquidity = usdc_amount / (sqrt_p_upper * sqrt_p_lower)
         required_weth = liquidity * (sqrt_p_upper - sqrt_p_lower)
         return required_weth, usdc_amount
-    raise ValueError("Must provide either WETH or USDC amount")
+    raise ValueError("ERROR: Must provide either WETH or USDC amount.")
 
 #############################
 # 3) Contract Operations
 #############################
 
 def compile_and_deploy_mock():
-    print("🔨 Compiling mock position manager...")
+    print("=== Compiling MockNonfungiblePositionManager.sol ===")
     compiled = compile_files(
         [MOCK_CONTRACT_PATH],
         output_values=["abi", "bin"],
@@ -86,14 +86,14 @@ def compile_and_deploy_mock():
         abi=contract_interface["abi"],
         bytecode=contract_interface["bin"]
     )
-    print("🚀 Deploying mock position manager...")
-    tx_hash = MockPositionManager.constructor().transact({"from": owner, "gas": 3_000_000})
+    print(">>> Deploying MockNonfungiblePositionManager.sol ...")
+    tx_hash = MockPositionManager.constructor().transact({"from": owner, "gas": 3000000})
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-    print(f"Mock deployed at: {receipt.contractAddress}")
+    print(f"INFO: Mock deployed at: {receipt.contractAddress}")
     return receipt.contractAddress
 
 def compile_and_deploy_liquidity(mock_pm_address):
-    print("🔨 Compiling LiquidityMatching contract...")
+    print("=== Compiling LiquidityMatching.sol ===")
     compiled = compile_files(
         [CONTRACT_PATH],
         output_values=["abi", "bin"],
@@ -111,14 +111,14 @@ def compile_and_deploy_liquidity(mock_pm_address):
         abi=contract_interface["abi"],
         bytecode=contract_interface["bin"]
     )
-    print("🚀 Deploying LiquidityMatching contract...")
+    print(">>> Deploying LiquidityMatching contract ...")
     tx_hash = LiquidityMatching.constructor(
         to_checksum_address(WETH_ADDRESS),
         to_checksum_address(USDC_ADDRESS),
         to_checksum_address(mock_pm_address)
-    ).transact({"from": owner, "gas": 3_000_000})
+    ).transact({"from": owner, "gas": 3000000})
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-    print(f"LiquidityMatching deployed at: {receipt.contractAddress}")
+    print(f"INFO: LiquidityMatching deployed at: {receipt.contractAddress}")
     return w3.eth.contract(address=receipt.contractAddress, abi=contract_interface["abi"])
 
 def deposit_tokens(contract, token_type, user, amount):
@@ -138,16 +138,17 @@ def deposit_tokens(contract, token_type, user, amount):
         contract.functions.depositWETH(amount_wei).transact({"from": user, "gas": 2000000})
     else:
         contract.functions.depositUSDC(amount_wei).transact({"from": user, "gas": 2000000})
-    print(f"✅ Deposited {amount} {token_type} from {user}")
+    print(f"INFO: Deposited {amount} {token_type} from {user}")
 
 def calculate_matched_amounts(contract):
     base_price = fetch_weth_price()
     price_lower, price_upper = get_price_range(base_price)
-    print(f"\n📈 Market Price: ${base_price:.2f}")
-    print(f"📊 Liquidity Range: ${price_lower:.2f} - ${price_upper:.2f}")
+    print("=== Calculating Matched Amounts ===")
+    print(f"Market Price: ${base_price:.2f}")
+    print(f"Liquidity Range: ${price_lower:.2f} - ${price_upper:.2f}")
     total_weth = contract.functions.totalWETHDeposited().call() / 1e18
     total_usdc = contract.functions.totalUSDCDeposited().call() / 1e6
-    print(f"📦 Contract Holdings: {total_weth:.4f} WETH | {total_usdc:.2f} USDC")
+    print(f"Contract Holdings: {total_weth:.4f} WETH | {total_usdc:.2f} USDC")
     max_weth, required_usdc = calculate_liquidity(
         weth_amount=total_weth,
         price_lower=price_lower,
@@ -163,10 +164,12 @@ def calculate_matched_amounts(contract):
     return matched_weth, total_usdc
 
 def execute_liquidity_matching(contract):
-    matched_weth, matched_usdc = calculate_matched_amounts(contract)
-    print(f"\n⚖️  Matching {matched_weth:.4f} WETH with {matched_usdc:.2f} USDC")
+    constMatched = calculate_matched_amounts(contract)
+    matched_weth, matched_usdc = constMatched
+    print(f"=== Executing Liquidity Matching ===")
+    print(f"Matching {matched_weth:.4f} WETH with {matched_usdc:.2f} USDC")
     print(f"Matched USDC: {matched_usdc}")
-    print(f"Matched wETH: {matched_weth}")
+    print(f"Matched WETH: {matched_weth}")
     weth_wei = int(Decimal(str(matched_weth)) * Decimal("1e18"))
     usdc_wei = int(Decimal(str(matched_usdc)) * Decimal("1e6"))
     print("Amounts (in wei):", weth_wei, usdc_wei)
@@ -176,7 +179,7 @@ def execute_liquidity_matching(contract):
     ).transact({"from": owner, "gas": 500000})
     w3.eth.wait_for_transaction_receipt(tx_hash)
     fetch_events(contract)
-    print(f"✅ Liquidity matched in tx: {tx_hash.hex()}")
+    print(f"INFO: Liquidity matched in transaction: {tx_hash.hex()}")
 
 def fetch_events(contract):
     latest_block = w3.eth.block_number
@@ -185,29 +188,29 @@ def fetch_events(contract):
         for event in lm_events:
             print("LiquidityMatched event:", event.args)
     except Exception as e:
-        print("Error fetching LiquidityMatched events:", e)
+        print("WARNING: Error fetching LiquidityMatched events:", e)
     try:
         mt_events = contract.events.MatchingTriggered().get_logs(fromBlock=latest_block - 10)
         for event in mt_events:
             print("MatchingTriggered event:", event.args)
     except Exception as e:
-        print("Error fetching MatchingTriggered events:", e)
+        print("WARNING: Error fetching MatchingTriggered events:", e)
 
 def advance_time(seconds):
-    # Use RPCEndpoint to avoid type errors in newer web3 versions
     w3.provider.make_request(RPCEndpoint("evm_increaseTime"), [seconds])
     w3.provider.make_request(RPCEndpoint("evm_mine"), [])
+    print(f"INFO: Advanced time by {seconds} seconds.")
 
 def withdraw_and_distribute(contract):
-    print("⏳ Advancing time by 10 minutes...")
-    advance_time(600)  # 600 seconds = 10 minutes
-    print("⏰ Time advanced. Calling withdrawAndDistribute()...")
+    print("=== Initiating Withdrawal Process ===")
+    print("Advancing time by 10 minutes...")
+    advance_time(600)
+    print("Calling withdrawAndDistribute()...")
     tx_hash = contract.functions.withdrawAndDistribute().transact({"from": owner, "gas": 500000})
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-    print(f"✅ withdrawAndDistribute executed in tx: {tx_hash.hex()}")
+    print(f"INFO: withdrawAndDistribute executed in transaction: {tx_hash.hex()}")
 
 def get_token_balance(token_address, account):
-    # Helper function to get the balance of a token for a given account.
     token = w3.eth.contract(
         address=token_address,
         abi=[{
@@ -221,7 +224,7 @@ def get_token_balance(token_address, account):
     return token.functions.balanceOf(account).call()
 
 def print_all_balances(contract, pool_address):
-    print("\n========== BALANCES ==========")
+    print("\n========== CURRENT BALANCES ==========")
     print("LiquidityMatching Contract:")
     print("  WETH:", get_token_balance(WETH_ADDRESS, contract.address))
     print("  USDC:", get_token_balance(USDC_ADDRESS, contract.address))
@@ -233,49 +236,43 @@ def print_all_balances(contract, pool_address):
     print("Depositor (user_usdc):")
     print("  USDC:", get_token_balance(USDC_ADDRESS, user_usdc))
     print("Owner:", owner)
-    print("================================\n")
+    print("========================================\n")
 
 def main():
     # Deploy contracts
     mock_pm_address = compile_and_deploy_mock()
     contract = compile_and_deploy_liquidity(mock_pm_address)
-    print(f"📜 LiquidityMatching contract deployed at: {contract.address}")
+    print(f"INFO: LiquidityMatching contract deployed at: {contract.address}")
 
     # Make deposits
     deposit_tokens(contract, "WETH", user_weth, 0.2)
     deposit_tokens(contract, "USDC", user_usdc, 1)
 
-    # Check pool (mock position manager) balances before liquidity matching
-    print("Before Liquidity Matching:")
+    print("=== Balances BEFORE Liquidity Matching ===")
     print_all_balances(contract, mock_pm_address)
 
     # Execute liquidity matching
     execute_liquidity_matching(contract)
 
-    # Check pool balances after liquidity matching
-    print("After Liquidity Matching:")
+    print("=== Balances AFTER Liquidity Matching ===")
     print_all_balances(contract, mock_pm_address)
 
-    # Check deposit totals before withdrawal/distribution
     initial_weth = contract.functions.totalWETHDeposited().call() / 1e18
-    initial_usdc = contract.functions.totalUSDCDeposited().call() / 1e18  # Using 18 decimals for simplicity
-    print(f"🏁 Initial Holdings before withdrawAndDistribute: {initial_weth:.4f} WETH | {initial_usdc:.2f} USDC")
+    initial_usdc = contract.functions.totalUSDCDeposited().call() / 1e18
+    print(f"INFO: Initial Holdings before Withdrawal: {initial_weth:.4f} WETH | {initial_usdc:.2f} USDC")
 
-    # Print balances before withdrawal/distribution
-    print("Before withdrawAndDistribute:")
+    print("=== Balances BEFORE Withdrawal ===")
     print_all_balances(contract, mock_pm_address)
 
-    # Call withdraw and distribute (after simulating time advance)
+    # Call withdrawal
     withdraw_and_distribute(contract)
 
-    # Print balances after withdrawal/distribution
-    print("After withdrawAndDistribute:")
+    print("=== Balances AFTER Withdrawal ===")
     print_all_balances(contract, mock_pm_address)
 
-    # Final holdings in the contract should be zeroed out
     final_weth = contract.functions.totalWETHDeposited().call() / 1e18
     final_usdc = contract.functions.totalUSDCDeposited().call() / 1e18
-    print(f"\n🏁 Final Holdings after withdrawAndDistribute: {final_weth:.4f} WETH | {final_usdc:.2f} USDC")
+    print(f"INFO: Final Holdings after Withdrawal: {final_weth:.4f} WETH | {final_usdc:.2f} USDC")
 
 if __name__ == "__main__":
     main()
