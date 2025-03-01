@@ -63,13 +63,4 @@ We then deposit the tokens in the Uniswap liquidity pool.
 
 ### **Uniswap Integration**
 - **Liquidity Formula**: The project uses Uniswap's concentrated liquidity formula to calculate the optimal amount of liquidity to provide within a specified price range.
-  - Formula: 
-    \[
-    L = \frac{\Delta y}{\sqrt{P} - \sqrt{P_{lower}}}
-    \]
-    Where:
-    - \( L \) = Liquidity
-    - \( \Delta y \) = Amount of token Y
-    - \( P \) = Current price
-    - \( P_{lower} \) = Lower price bound
 - **Liquidity Provision**: The system interacts with Uniswap's `NonfungiblePositionManager` to mint liquidity positions and deposit tokens into the pool.
