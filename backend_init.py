@@ -215,14 +215,15 @@ def main():
 
 
     # ✅ Wrap ETH to WETH
-    wrap_eth(accounts[0], 50)
+    # wrap_eth(accounts[0], 50)
     wrap_eth(accounts[1], 50)
-    wrap_eth(accounts[2], 50)
+    # wrap_eth(accounts[2], 50)
 
 
     # ✅ Swap 10 WETH for USDC using Uniswap V2 (with price safety)
-    for i in range(3):
-       swap_weth_to_usdc(w3, accounts[i], 50, private_keys[i])
+    # for i in range(3):
+    # swap_weth_to_usdc(w3, accounts[1], 100, private_keys[1])
+
 
     # ✅ Display Balances After Swap
     display_account_balances(w3, accounts)
