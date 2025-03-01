@@ -9,7 +9,7 @@ interface MatchingAnimationProps {
 const MatchingAnimation: React.FC<MatchingAnimationProps> = ({ className = '' }) => {
   const controls = useAnimation();
   const [ref, inView] = useInView({ threshold: 0.3, triggerOnce: true });
-  const animationRef = useRef<NodeJS.Timeout | null>(null);
+  const animationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   useEffect(() => {
     if (inView) {

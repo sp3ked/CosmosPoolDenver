@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useNotification } from "../context/NotificationContext";
-import { depositUSDC, depositWETH, approveWETH } from "../utils/contract";
+import { depositUSDC, depositWETH } from "../utils/contract";
 
 interface Pool {
   id: string;
@@ -80,17 +80,17 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
     try {
       showNotification("info", "Transaction initiated. Please confirm in your wallet.", "Transaction Pending");
       
-      let txHash;
+      let success;
       if (selectedSide === "tokenA" && tokenA === "ETH") {
-        txHash = await depositWETH(depositAmount);
+        success = await depositWETH(depositAmount);
       } else if (selectedSide === "tokenB" && tokenB === "ETH") {
-        txHash = await depositWETH(depositAmount);
+        success = await depositWETH(depositAmount);
       } else {
-        txHash = await depositUSDC(depositAmount);
+        success = await depositUSDC(depositAmount);
       }
 
-      if (txHash) {
-        setTransactionHash(txHash);
+      if (success) {
+        setTransactionHash("Transaction successful"); // Changed to string
         showNotification(
           "success", 
           `Deposited ${depositAmount} ${selectedSide === "tokenA" ? tokenA : tokenB}`, 

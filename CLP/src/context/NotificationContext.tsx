@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import NotificationSystem, { Notification, NotificationType } from '../components/NotificationSystem';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid'; // updated import for uuid
 
 interface NotificationContextProps {
   showNotification: (
