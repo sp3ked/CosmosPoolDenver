@@ -35,7 +35,7 @@ interface INonfungiblePositionManager {
 contract LiquidityMatching {
     address public wETH = 0x4200000000000000000000000000000000000006;
     address public USDC = 0x078D782b760474a361dDA0AF3839290b0EF57AD6;
-    // We no longer hardcode the position manager address; it is passed in.
+    // Position manager address is now provided via the constructor.
     address public positionManager;
     address public constant UNISWAP_V3_FACTORY = 0x1F98400000000000000000000000000000000003;
 
@@ -47,6 +47,8 @@ contract LiquidityMatching {
     int24 public constant TICK_LOWER = 199200;
     int24 public constant TICK_UPPER = 199260;
 
+    uint256 public matchingTimestamp; // Timestamp when liquidity matching is triggered
+
     struct Deposit {
         address depositor;
         uint256 amount;
@@ -54,21 +56,28 @@ contract LiquidityMatching {
         uint256 timestamp;
     }
 
+    // Mappings to track deposits
     mapping(address => Deposit) public usdcDeposits;
     mapping(address => Deposit) public wethDeposits;
+
+    // Arrays to allow iteration over depositors during distribution.
+    address[] public usdcDepositors;
+    address[] public wethDepositors;
+
     mapping(uint256 => bool) public managedPositions;
 
     event UsdcDeposited(address indexed depositor, uint256 amount, uint256 timestamp);
     event WethDeposited(address indexed depositor, uint256 amount, uint256 timestamp);
     event LiquidityMatched(address indexed token0, address indexed token1, uint256 amount0, uint256 amount1, uint256 tokenId);
     event MatchingTriggered();
+    event WithdrawAndDistribute(uint256 timestamp);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not authorized");
         _;
     }
 
-    // Now the constructor accepts the position manager address.
+    // Constructor now accepts the position manager address.
     constructor(address _weth, address _usdc, address _positionManager) {
         wETH = _weth;
         USDC = _usdc;
@@ -95,6 +104,10 @@ contract LiquidityMatching {
         IERC20(USDC).transferFrom(msg.sender, address(this), amount);
         totalUSDCDeposited += amount;
 
+        // Add depositor to array if first deposit.
+        if (usdcDeposits[msg.sender].amount == 0) {
+            usdcDepositors.push(msg.sender);
+        }
         usdcDeposits[msg.sender].depositor = msg.sender;
         usdcDeposits[msg.sender].amount += amount;
         usdcDeposits[msg.sender].unmatchedAmount += amount;
@@ -108,6 +121,9 @@ contract LiquidityMatching {
         IERC20(wETH).transferFrom(msg.sender, address(this), amount);
         totalWETHDeposited += amount;
 
+        if (wethDeposits[msg.sender].amount == 0) {
+            wethDepositors.push(msg.sender);
+        }
         wethDeposits[msg.sender].depositor = msg.sender;
         wethDeposits[msg.sender].amount += amount;
         wethDeposits[msg.sender].unmatchedAmount += amount;
@@ -116,14 +132,15 @@ contract LiquidityMatching {
         emit WethDeposited(msg.sender, amount, block.timestamp);
     }
 
-    // The minting function that calls the position manager
+    // Triggers liquidity matching and records the matching timestamp.
     function triggerLiquidityMatching(uint256 amountUSDC, uint256 amountWETH) external {
+        matchingTimestamp = block.timestamp;
         uint24 fee = 500; // fee tier for your pool (0.05%)
         executeLiquidityProvision(amountUSDC, amountWETH, fee);
         emit MatchingTriggered();
     }
 
-        function executeLiquidityProvision(uint256 amountUSDC, uint256 amountWETH, uint24 poolFee)
+    function executeLiquidityProvision(uint256 amountUSDC, uint256 amountWETH, uint24 poolFee)
         public
         onlyOwner
         returns (uint256 tokenId)
@@ -172,7 +189,6 @@ contract LiquidityMatching {
         return tokenId;
     }
 
-
     function _sortTokens(uint256 amountUSDC, uint256 amountWETH)
         internal
         view
@@ -190,5 +206,55 @@ contract LiquidityMatching {
             amount1 = amountUSDC;
         }
         return (token0, token1, amount0, amount1);
+    }
+
+    // Withdraws liquidity and distributes funds to depositors after at least 10 minutes
+    // from matching. Depositors receive their principal plus a bonus:
+    // 6% extra for WETH depositors and 4% extra for USDC depositors (totaling 10% fees).
+    function withdrawAndDistribute() external onlyOwner {
+        require(matchingTimestamp > 0, "Liquidity matching not triggered");
+        require(block.timestamp >= matchingTimestamp + 10 minutes, "Too early to withdraw");
+
+        // Calculate bonus amounts based on total remaining deposits.
+        uint256 totalWETHFee = totalWETHDeposited * 10 / 100; // 10% fee on WETH deposits
+        uint256 totalUSDCFee = totalUSDCDeposited * 10 / 100;  // 10% fee on USDC deposits
+
+        // Distribution: 60% of fee bonus to WETH depositors, 40% to USDC depositors.
+        uint256 wethBonusRate = 60;
+        uint256 usdcBonusRate = 40;
+
+        // Distribute WETH deposits
+        for (uint i = 0; i < wethDepositors.length; i++) {
+            address depositor = wethDepositors[i];
+            uint256 depositAmount = wethDeposits[depositor].amount;
+            if (depositAmount > 0) {
+                // Calculate bonus: proportional share of total fee times the bonus rate.
+                uint256 bonus = depositAmount * totalWETHFee * wethBonusRate / 100 / totalWETHDeposited;
+                uint256 payout = depositAmount + bonus;
+                IERC20(wETH).transfer(depositor, payout);
+                // Reset depositor's record.
+                wethDeposits[depositor].amount = 0;
+                wethDeposits[depositor].unmatchedAmount = 0;
+            }
+        }
+
+        // Distribute USDC deposits
+        for (uint i = 0; i < usdcDepositors.length; i++) {
+            address depositor = usdcDepositors[i];
+            uint256 depositAmount = usdcDeposits[depositor].amount;
+            if (depositAmount > 0) {
+                uint256 bonus = depositAmount * totalUSDCFee * usdcBonusRate / 100 / totalUSDCDeposited;
+                uint256 payout = depositAmount + bonus;
+                IERC20(USDC).transfer(depositor, payout);
+                usdcDeposits[depositor].amount = 0;
+                usdcDeposits[depositor].unmatchedAmount = 0;
+            }
+        }
+
+        // Reset total deposit tracking.
+        totalWETHDeposited = 0;
+        totalUSDCDeposited = 0;
+
+        emit WithdrawAndDistribute(block.timestamp);
     }
 }
