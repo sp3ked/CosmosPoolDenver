@@ -5,7 +5,6 @@ import AddLiquidityModal from '../components/AddLiquidityModal';
 import { motion } from 'framer-motion';
 import { useNotification } from "../context/NotificationContext";
 import { useWallet } from '../context/WalletContext';
-import { useNavigate } from 'react-router-dom';
 
 interface Pool {
   id: string;
