@@ -80,13 +80,13 @@ contract MockNonfungiblePositionManager is INonfungiblePositionManager {
         require(block.timestamp <= params.deadline, "Deadline passed");
 
         tokenId = nextTokenId++;
-        // For simulation, we assume the entire desired amounts are used.
-        amount0 = params.amount0Desired;
-        amount1 = params.amount1Desired;
-        // For demonstration, assign a dummy liquidity value.
+        // For simulation, assume the entire desired amounts are used and add a 10% fee bonus.
+        amount0 = params.amount0Desired + (params.amount0Desired * 10 / 100);
+        amount1 = params.amount1Desired + (params.amount1Desired * 10 / 100);
+        // Assign a dummy liquidity value.
         liquidity = 1000000;
 
-        // Save a new position with minimal details.
+        // Save the new position.
         positionsData[tokenId] = Position({
             nonce: 0,
             operator: msg.sender,
