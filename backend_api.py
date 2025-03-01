@@ -181,16 +181,17 @@ def fetch_events(contract):
     try:
         lm_events = contract.events.LiquidityMatched().get_logs(fromBlock=latest_block - 10)
         for event in lm_events:
-            events["LiquidityMatched"].append(event.args)
+            events["LiquidityMatched"].append(dict(event.args))
     except Exception as e:
         print("WARNING: Error fetching LiquidityMatched events:", e)
     try:
         mt_events = contract.events.MatchingTriggered().get_logs(fromBlock=latest_block - 10)
         for event in mt_events:
-            events["MatchingTriggered"].append(event.args)
+            events["MatchingTriggered"].append(dict(event.args))
     except Exception as e:
         print("WARNING: Error fetching MatchingTriggered events:", e)
     return events
+
 
 def advance_time(seconds):
     w3.provider.make_request(RPCEndpoint("evm_increaseTime"), [seconds])
