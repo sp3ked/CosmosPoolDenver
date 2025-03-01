@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNotification } from "../context/NotificationContext";
 import { depositUSDC, depositWETH } from "../utils/contract";
 
@@ -27,6 +27,12 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
   const [matchProgress, setMatchProgress] = useState(0);
   const [matchStatus, setMatchStatus] = useState("Waiting for match");
 
+  // Check if wallet is connected (you can use any method that works in your app)
+  const isWalletConnected = (): boolean => {
+    // Check for wallet connection - can be adapted to your specific wallet implementation
+    return window.ethereum && window.ethereum.selectedAddress ? true : false;
+  };
+
   useEffect(() => {
     if (pool) {
       setTokenA(pool.tokenA);
@@ -40,6 +46,17 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
   };
 
   const handleAddLiquidity = async () => {
+    // First check if wallet is connected
+    if (!isWalletConnected()) {
+      showNotification(
+        "warning", 
+        "Please connect your wallet before adding liquidity to this pool.",
+        "Wallet Required"
+      );
+      onClose(); // Close the modal
+      return;
+    }
+
     if (!selectedSide || !amount || parseFloat(amount) <= 0) {
       showNotification("warning", "Enter a valid deposit amount", "Invalid Input");
       return;

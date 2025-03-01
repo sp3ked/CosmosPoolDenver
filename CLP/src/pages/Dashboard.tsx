@@ -3,6 +3,8 @@ import DashNav from "../components/DashNav";
 import SpaceBackground from '../components/backgrounds/spaceBg';
 import AddLiquidityModal from '../components/AddLiquidityModal';
 import { motion } from 'framer-motion';
+import React from "react";
+import { useNotification } from "../context/NotificationContext";
 
 interface Pool {
   id: string;
@@ -179,7 +181,26 @@ const allPools: Pool[] = [
 ];
 
 function Dashboard() {
+  const { showNotification } = useNotification();
   const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+
+  // Function to check wallet connection before opening AddLiquidityModal
+  const handleJoinPool = (pool: Pool) => {
+    // Check if wallet is connected
+    const isWalletConnected = window.ethereum && (window.ethereum as any).selectedAddress;
+    
+    if (!isWalletConnected) {
+      showNotification(
+        "warning",
+        "You need to connect your wallet before joining a pool.",
+        "Wallet Connection Required"
+      );
+      return;
+    }
+    
+    // If wallet is connected, proceed with existing functionality
+    setSelectedPool(pool);
+  };
 
   return (
     <div className="relative min-h-screen">
@@ -322,7 +343,7 @@ function Dashboard() {
                       {/* Call to action - New animated border button */}
                       <div className="mt-6 flex justify-center">
                         <button 
-                          onClick={() => !pool.greyedOut && setSelectedPool(pool)}  // Added same onClick handler as Join button
+                          onClick={() => !pool.greyedOut && handleJoinPool(pool)}  // Updated to use handleJoinPool
                           disabled={pool.greyedOut}
                           className={`relative inline-flex h-12 overflow-hidden rounded-full p-[1px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-50 ${
                             pool.greyedOut ? 'cursor-not-allowed opacity-75' : ''
@@ -386,7 +407,7 @@ function Dashboard() {
                     <div className="text-right">
                       {pool.available ? (
                         <button 
-                          onClick={() => setSelectedPool(pool)}
+                          onClick={() => handleJoinPool(pool)}  // Updated to use handleJoinPool
                           className="relative inline-flex h-9 overflow-hidden rounded-full p-[1px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-50"
                         >
                           <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#3B82F6_0%,#1E40AF_50%,#3B82F6_100%)]" />
