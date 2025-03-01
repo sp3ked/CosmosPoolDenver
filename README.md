@@ -17,10 +17,10 @@ lp-provision-testing.py: Python script for testing contract deployment, deposits
 main.py: Basic script for interacting with the local node and displaying balances. 
 
 **LiquidityMatching.sol**
-The core smart contract that handles token deposits, liquidity matching, and reward distribution. Key functions include:
-depositUSDC(uint256 amount): Allows users to deposit USDC.
-depositWETH(uint256 amount): Allows users to deposit WETH.
-triggerLiquidityMatching(uint256 amountUSDC, uint256 amountWETH): Triggers the liquidity matching process.
+The core smart contract that handles token deposits, liquidity matching, and reward distribution. Key functions include: \
+depositUSDC(uint256 amount): Allows users to deposit USDC. \
+depositWETH(uint256 amount): Allows users to deposit WETH. \
+triggerLiquidityMatching(uint256 amountUSDC, uint256 amountWETH): Triggers the liquidity matching process. \
 withdrawAndDistribute(): Withdraws funds from the pool and distributes rewards to users.
 
 **MockNonfungiblePositionManager.sol**
