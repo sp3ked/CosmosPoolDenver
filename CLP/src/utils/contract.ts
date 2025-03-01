@@ -1,6 +1,25 @@
 import { ethers, Signer, utils } from "ethers";
 import contractABI from "../contracts/LiquidityMatchingABI.json";
 
+const WETH_ABI = [
+    "function deposit() external payable",
+    "function transfer(address to, uint amount) returns (bool)",
+    "function approve(address spender, uint256 amount) external returns (bool)"
+];
+
+const USDC_ABI = [
+    "function transfer(address to, uint amount) returns (bool)",
+    "function approve(address spender, uint256 amount) external returns (bool)"
+];
+
+const POOL_ABI = [
+    "function depositSingle(address token, uint256 amount) external returns (bool)"
+];
+
+const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"; // Mainnet WETH
+const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // Mainnet USDC
+const POOL_ADDRESS = "0x1234567890123456789012345678901234567890"; // Example pool address
+
 declare global {
   interface Window {
     // ethereum: any;
@@ -41,38 +60,65 @@ export const connectWallet = async (): Promise<{ address: string; signer: Signer
     }
   };
 
-  export const depositUSDC = async (amount: number): Promise<boolean> => {
-    try {
-      const contract = await getContract();
-      if (!contract) return false;
-  
-      const amountInWei = utils.parseUnits(amount.toString(), 6); // Convert to USDC decimals (6)
-      
-      const tx = await contract.depositUSDC(amountInWei);
-      await tx.wait(); // Wait for transaction to be confirmed
-  
-      console.log("✅ USDC deposited:", amount);
-      return true;
-    } catch (error) {
-      console.error("❌ Failed to deposit USDC:", error);
-      return false;
+const getProviderAndSigner = async () => {
+    if (!window.ethereum) {
+        throw new Error("No Ethereum wallet found");
     }
-  };
 
-  export const depositWETH = async (amount: number): Promise<boolean> => {
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    return { provider, signer };
+};
+
+export const depositUSDC = async (amount: number): Promise<string> => {
     try {
-      const contract = await getContract();
-      if (!contract) return false;
-  
-      const amountInWei = utils.parseUnits(amount.toString(), 18); // Convert to 18 decimals for WETH
-  
-      const tx = await contract.depositWETH(amountInWei);
-      await tx.wait(); // Wait for transaction confirmation
-  
-      console.log("✅ WETH deposited:", amount);
-      return true;
+        const { signer } = await getProviderAndSigner();
+        const usdcContract = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
+        const poolContract = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
+        
+        // USDC has 6 decimals
+        const amountUSDC = ethers.utils.parseUnits(amount.toString(), 6);
+        
+        // Approve pool to spend USDC
+        const approveTx = await usdcContract.approve(POOL_ADDRESS, amountUSDC);
+        await approveTx.wait();
+        
+        // Deposit to pool
+        const depositTx = await poolContract.depositSingle(USDC_ADDRESS, amountUSDC);
+        const receipt = await depositTx.wait();
+        
+        return receipt.transactionHash;
     } catch (error) {
-      console.error("❌ Failed to deposit WETH:", error);
-      return false;
+        console.error("Error depositing USDC:", error);
+        throw error;
     }
-  };
+};
+
+export const depositWETH = async (amount: number): Promise<string> => {
+    try {
+        const { signer } = await getProviderAndSigner();
+        const wethContract = new ethers.Contract(WETH_ADDRESS, WETH_ABI, signer);
+        const poolContract = new ethers.Contract(POOL_ADDRESS, POOL_ABI, signer);
+        
+        // Convert amount to wei
+        const amountWei = ethers.utils.parseEther(amount.toString());
+        
+        // First deposit ETH to get WETH
+        const depositTx = await wethContract.deposit({ value: amountWei });
+        await depositTx.wait();
+        
+        // Approve pool to spend WETH
+        const approveTx = await wethContract.approve(POOL_ADDRESS, amountWei);
+        await approveTx.wait();
+        
+        // Deposit to pool
+        const depositPoolTx = await poolContract.depositSingle(WETH_ADDRESS, amountWei);
+        const receipt = await depositPoolTx.wait();
+        
+        return receipt.transactionHash;
+    } catch (error) {
+        console.error("Error depositing WETH:", error);
+        throw error;
+    }
+};

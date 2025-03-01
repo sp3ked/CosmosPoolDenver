@@ -26,6 +26,8 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
   const [tokenB, setTokenB] = useState("");
   const [matchProgress, setMatchProgress] = useState(0);
   const [matchStatus, setMatchStatus] = useState("Waiting for match");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
 
   // Check if wallet is connected (you can use any method that works in your app)
   const isWalletConnected = (): boolean => {
@@ -46,14 +48,13 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
   };
 
   const handleAddLiquidity = async () => {
-    // First check if wallet is connected
     if (!isWalletConnected()) {
       showNotification(
         "warning", 
         "Please connect your wallet before adding liquidity to this pool.",
         "Wallet Required"
       );
-      onClose(); // Close the modal
+      onClose();
       return;
     }
 
@@ -62,28 +63,42 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
       return;
     }
 
+    setIsProcessing(true);
     const depositAmount = parseFloat(amount);
-    let success = false;
 
     try {
+      showNotification("info", "Transaction initiated. Please confirm in your wallet.", "Transaction Pending");
+      
+      let txHash;
       if (selectedSide === "tokenA" && tokenA === "ETH") {
-        success = await depositWETH(depositAmount);
+        txHash = await depositWETH(depositAmount);
       } else if (selectedSide === "tokenB" && tokenB === "ETH") {
-        success = await depositWETH(depositAmount);
+        txHash = await depositWETH(depositAmount);
       } else {
-        success = await depositUSDC(depositAmount);
+        txHash = await depositUSDC(depositAmount);
       }
 
-      if (success) {
-        showNotification("success", `Deposited ${depositAmount} ${selectedSide === "tokenA" ? tokenA : tokenB}`, "Deposit Successful");
-        setAmount(""); // Reset input field
-        simulateMatchingProcess(); // Simulate the match status UI
+      if (txHash) {
+        setTransactionHash(txHash);
+        showNotification(
+          "success", 
+          `Deposited ${depositAmount} ${selectedSide === "tokenA" ? tokenA : tokenB}`, 
+          "Deposit Successful"
+        );
+        setAmount("");
+        simulateMatchingProcess();
       } else {
-        showNotification("error", "Transaction failed", "Deposit Failed");
+        throw new Error("Transaction failed");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Deposit failed:", error);
-      showNotification("error", "Transaction failed. Please try again.", "Deposit Error");
+      showNotification(
+        "error", 
+        error.message || "Transaction failed. Please try again.", 
+        "Deposit Error"
+      );
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -98,6 +113,11 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
       if (progress >= 100) {
         clearInterval(interval);
         setMatchStatus("Match complete!");
+        showNotification(
+          "success", 
+          "Your liquidity is now active and earning fees!", 
+          "Pool Join Successful"
+        );
       }
     }, 500);
   };
@@ -105,32 +125,46 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
   if (!isOpen || !pool) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-gray-900 border border-blue-900/50 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-gradient-to-b from-blue-900/30 to-indigo-900/30 backdrop-blur-md border border-blue-500/30 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[0_0_15px_rgba(59,130,246,0.3)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white">Single-Sided Deposit: {pool.tokenA}/{pool.tokenB}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+        {/* Header with glowing text */}
+        <div className="flex justify-between items-center mb-7">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent drop-shadow-[0_0_5px_rgba(59,130,246,0.5)]">
+            Single-Sided Deposit: {pool.tokenA}/{pool.tokenB}
+          </h2>
+          <button 
+            onClick={onClose} 
+            className="text-gray-400 hover:text-white transition-colors cursor-pointer hover:bg-blue-900/20 p-2 rounded-full"
+          >
+            ✕
+          </button>
         </div>
 
-        {/* Token Selection */}
+        {/* Token Selection with more contrast between selected/non-selected */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => handleSideSelect("tokenA")}
-            className={`relative p-6 rounded-lg border-2 transition-colors ${
-              selectedSide === "tokenA" ? "border-blue-500 bg-blue-900/30" : "border-blue-900/50 bg-blue-900/20 hover:border-blue-500/50"
+            className={`relative p-6 rounded-xl border transition-all duration-300 ${
+              selectedSide === "tokenA" 
+                ? "border-blue-500 bg-blue-600/20 shadow-[0_0_10px_rgba(59,130,246,0.4)]" 
+                : "border-blue-800/30 bg-blue-900/5 backdrop-blur-sm hover:border-blue-700/30 opacity-60"
             }`}
           >
             <div className="text-center">
-              <div className="text-2xl font-bold text-white mb-2">{pool.tokenA}</div>
-              <div className="text-sm text-gray-400">Volatile Token</div>
+              <div className={`text-2xl font-bold mb-2 ${selectedSide === "tokenA" ? "text-white" : "text-white/70"}`}>
+                {pool.tokenA}
+              </div>
+              <div className={`text-sm ${selectedSide === "tokenA" ? "text-blue-200/70" : "text-blue-200/40"}`}>
+                Volatile Token
+              </div>
             </div>
           </motion.button>
 
@@ -138,21 +172,27 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => handleSideSelect("tokenB")}
-            className={`relative p-6 rounded-lg border-2 transition-colors ${
-              selectedSide === "tokenB" ? "border-blue-500 bg-blue-900/30" : "border-blue-900/50 bg-blue-900/20 hover:border-blue-500/50"
+            className={`relative p-6 rounded-xl border transition-all duration-300 ${
+              selectedSide === "tokenB" 
+                ? "border-blue-500 bg-blue-600/20 shadow-[0_0_10px_rgba(59,130,246,0.4)]" 
+                : "border-blue-800/30 bg-blue-900/5 backdrop-blur-sm hover:border-blue-700/30 opacity-60"
             }`}
           >
             <div className="text-center">
-              <div className="text-2xl font-bold text-white mb-2">{pool.tokenB}</div>
-              <div className="text-sm text-gray-400">Stable Token</div>
+              <div className={`text-2xl font-bold mb-2 ${selectedSide === "tokenB" ? "text-white" : "text-white/70"}`}>
+                {pool.tokenB}
+              </div>
+              <div className={`text-sm ${selectedSide === "tokenB" ? "text-blue-200/70" : "text-blue-200/40"}`}>
+                Stable Token
+              </div>
             </div>
           </motion.button>
         </div>
 
-        {/* Amount Input */}
-        <div className="bg-black/30 rounded-lg p-4 border border-blue-900/50">
+        {/* Glass input field */}
+        <div className="bg-black/20 backdrop-blur-md rounded-xl p-4 border border-blue-500/30">
           <div className="flex justify-between mb-2">
-            <span className="text-sm text-gray-400">Amount to deposit:</span>
+            <span className="text-sm text-blue-200/80">Amount to deposit:</span>
           </div>
           <div className="flex items-center">
             <input
@@ -160,37 +200,69 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({ isOpen, onClose, 
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.0"
+              disabled={isProcessing}
               className="bg-transparent text-xl w-full focus:outline-none text-white"
             />
-            <span className="text-lg font-medium text-white">
-              {selectedSide === "tokenA" ? pool.tokenA : pool.tokenB}
+            <span className="text-lg font-medium text-blue-300">
+              {selectedSide === "tokenA" ? pool.tokenA : selectedSide === "tokenB" ? pool.tokenB : ""}
             </span>
           </div>
         </div>
 
-        {/* Match Status */}
-        <div className="mt-4">
-          <p className="text-gray-400">Match Status</p>
-          <div className="relative w-full h-2 bg-gray-700 rounded-full">
-            <div className="absolute h-2 bg-blue-500 rounded-full" style={{ width: `${matchProgress}%` }}></div>
+        {/* Match Status with glowing progress */}
+        <div className="mt-6 bg-black/30 backdrop-blur-sm p-4 rounded-xl border border-blue-500/20">
+          <p className="text-blue-200/80 mb-2">Match Status</p>
+          <div className="relative w-full h-2 bg-blue-900/40 rounded-full overflow-hidden">
+            <div 
+              className="absolute h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500"
+              style={{ width: `${matchProgress}%` }}
+            ></div>
           </div>
-          <p className="text-gray-300 mt-2">{matchStatus}</p>
+          <p className="text-blue-100 mt-3 text-sm">{matchStatus}</p>
         </div>
 
-        {/* Confirm Deposit Button */}
+        {/* Transaction hash display */}
+        {transactionHash && (
+          <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+            <p className="text-sm text-gray-300 mb-1">Transaction Hash:</p>
+            <a 
+              href={`https://etherscan.io/tx/${transactionHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-400 hover:text-blue-300 truncate block"
+            >
+              {transactionHash}
+            </a>
+          </div>
+        )}
+
+        {/* Confirm Deposit Button with animation */}
         <div className="flex justify-end gap-4 mt-6">
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleAddLiquidity}
-            disabled={!amount || parseFloat(amount) <= 0}
-            className={`px-6 py-3 text-white font-medium rounded-lg ${
-              !amount || parseFloat(amount) <= 0 
-                ? "bg-gray-600 cursor-not-allowed" 
-                : "bg-blue-600 hover:bg-blue-700"
+            disabled={!selectedSide || !amount || parseFloat(amount) <= 0 || isProcessing}
+            className={`relative inline-flex h-12 overflow-hidden rounded-xl p-[1px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+              !selectedSide || !amount || parseFloat(amount) <= 0 || isProcessing
+                ? "opacity-50 cursor-not-allowed" 
+                : ""
             }`}
           >
-            Confirm Deposit
+            <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#3B82F6_0%,#1E40AF_50%,#3B82F6_100%)]" />
+            <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-xl bg-slate-950 px-8 py-1 text-base font-medium text-white backdrop-blur-3xl">
+              {isProcessing ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing...
+                </>
+              ) : (
+                "Confirm Deposit"
+              )}
+            </span>
           </motion.button>
         </div>
       </motion.div>
