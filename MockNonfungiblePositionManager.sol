@@ -2,6 +2,8 @@
 pragma solidity ^0.7.6;
 pragma abicoder v2;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 interface INonfungiblePositionManager {
     struct MintParams {
         address token0;
@@ -28,7 +30,9 @@ interface INonfungiblePositionManager {
             uint256 amount1
         );
 
-    // A positions function to return details about a minted position.
+    // Added withdrawTokens so that the pool can send its token balances back.
+    function withdrawTokens(address token, address to) external;
+
     function positions(uint256 tokenId) external view returns (
         uint96 nonce,
         address operator,
@@ -79,14 +83,25 @@ contract MockNonfungiblePositionManager is INonfungiblePositionManager {
         require(params.amount0Desired > 0 && params.amount1Desired > 0, "Amounts must be > 0");
         require(block.timestamp <= params.deadline, "Deadline passed");
 
+        // Pull tokens from msg.sender (expected to be the LiquidityMatching contract).
+        require(
+            IERC20(params.token0).transferFrom(msg.sender, address(this), params.amount0Desired),
+            "Transfer of token0 failed"
+        );
+        require(
+            IERC20(params.token1).transferFrom(msg.sender, address(this), params.amount1Desired),
+            "Transfer of token1 failed"
+        );
+
         tokenId = nextTokenId++;
-        // For simulation, assume the entire desired amounts are used and add a 10% fee bonus.
+
+        // Simulate fee generation: add a 10% bonus to each desired amount.
         amount0 = params.amount0Desired + (params.amount0Desired * 10 / 100);
         amount1 = params.amount1Desired + (params.amount1Desired * 10 / 100);
-        // Assign a dummy liquidity value.
+
+        // Dummy liquidity.
         liquidity = 1000000;
 
-        // Save the new position.
         positionsData[tokenId] = Position({
             nonce: 0,
             operator: msg.sender,
@@ -101,6 +116,13 @@ contract MockNonfungiblePositionManager is INonfungiblePositionManager {
             tokensOwed0: 0,
             tokensOwed1: 0
         });
+    }
+
+    // The withdrawTokens function transfers the entire balance of the specified token from the pool to the given address.
+    function withdrawTokens(address token, address to) external override {
+        uint256 bal = IERC20(token).balanceOf(address(this));
+        require(bal > 0, "No tokens to withdraw");
+        require(IERC20(token).transfer(to, bal), "Transfer failed");
     }
 
     function positions(uint256 tokenId) external view override returns (

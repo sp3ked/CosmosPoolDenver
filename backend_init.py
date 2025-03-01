@@ -221,8 +221,8 @@ def main():
 
 
     # ✅ Swap 10 WETH for USDC using Uniswap V2 (with price safety)
-    # for i in range(3):
-    # swap_weth_to_usdc(w3, accounts[1], 100, private_keys[1])
+    for i in range(3):
+        swap_weth_to_usdc(w3, accounts[1], 100, private_keys[1])
 
 
     # ✅ Display Balances After Swap

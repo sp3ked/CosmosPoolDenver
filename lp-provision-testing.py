@@ -8,6 +8,7 @@ from web3 import Web3
 from web3.middleware import geth_poa_middleware
 from eth_utils import to_checksum_address
 from solcx import compile_files, install_solc
+from web3.types import RPCEndpoint
 
 getcontext().prec = 100  # Increase precision
 install_solc("0.7.6")
@@ -192,26 +193,88 @@ def fetch_events(contract):
     except Exception as e:
         print("Error fetching MatchingTriggered events:", e)
 
+def advance_time(seconds):
+    # Use RPCEndpoint to avoid type errors in newer web3 versions
+    w3.provider.make_request(RPCEndpoint("evm_increaseTime"), [seconds])
+    w3.provider.make_request(RPCEndpoint("evm_mine"), [])
+
 def withdraw_and_distribute(contract):
-    # Simulate the passing of 10 minutes using Hardhat's evm_increaseTime and evm_mine methods.
     print("⏳ Advancing time by 10 minutes...")
-    w3.provider.make_request("evm_increaseTime", [600])
-    w3.provider.make_request("evm_mine", [])
+    advance_time(600)  # 600 seconds = 10 minutes
     print("⏰ Time advanced. Calling withdrawAndDistribute()...")
     tx_hash = contract.functions.withdrawAndDistribute().transact({"from": owner, "gas": 500000})
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
     print(f"✅ withdrawAndDistribute executed in tx: {tx_hash.hex()}")
 
+def get_token_balance(token_address, account):
+    # Helper function to get the balance of a token for a given account.
+    token = w3.eth.contract(
+        address=token_address,
+        abi=[{
+            "constant": True,
+            "inputs": [{"name": "account", "type": "address"}],
+            "name": "balanceOf",
+            "outputs": [{"name": "", "type": "uint256"}],
+            "type": "function"
+        }]
+    )
+    return token.functions.balanceOf(account).call()
+
+def print_all_balances(contract, pool_address):
+    print("\n========== BALANCES ==========")
+    print("LiquidityMatching Contract:")
+    print("  WETH:", get_token_balance(WETH_ADDRESS, contract.address))
+    print("  USDC:", get_token_balance(USDC_ADDRESS, contract.address))
+    print("Mock Position Manager (Pool):")
+    print("  WETH:", get_token_balance(WETH_ADDRESS, pool_address))
+    print("  USDC:", get_token_balance(USDC_ADDRESS, pool_address))
+    print("Depositor (user_weth):")
+    print("  WETH:", get_token_balance(WETH_ADDRESS, user_weth))
+    print("Depositor (user_usdc):")
+    print("  USDC:", get_token_balance(USDC_ADDRESS, user_usdc))
+    print("Owner:", owner)
+    print("================================\n")
+
 def main():
+    # Deploy contracts
     mock_pm_address = compile_and_deploy_mock()
     contract = compile_and_deploy_liquidity(mock_pm_address)
     print(f"📜 LiquidityMatching contract deployed at: {contract.address}")
+
+    # Make deposits
     deposit_tokens(contract, "WETH", user_weth, 0.2)
-    deposit_tokens(contract, "USDC", user_usdc, 5)
+    deposit_tokens(contract, "USDC", user_usdc, 1)
+
+    # Check pool (mock position manager) balances before liquidity matching
+    print("Before Liquidity Matching:")
+    print_all_balances(contract, mock_pm_address)
+
+    # Execute liquidity matching
     execute_liquidity_matching(contract)
+
+    # Check pool balances after liquidity matching
+    print("After Liquidity Matching:")
+    print_all_balances(contract, mock_pm_address)
+
+    # Check deposit totals before withdrawal/distribution
+    initial_weth = contract.functions.totalWETHDeposited().call() / 1e18
+    initial_usdc = contract.functions.totalUSDCDeposited().call() / 1e18  # Using 18 decimals for simplicity
+    print(f"🏁 Initial Holdings before withdrawAndDistribute: {initial_weth:.4f} WETH | {initial_usdc:.2f} USDC")
+
+    # Print balances before withdrawal/distribution
+    print("Before withdrawAndDistribute:")
+    print_all_balances(contract, mock_pm_address)
+
+    # Call withdraw and distribute (after simulating time advance)
     withdraw_and_distribute(contract)
+
+    # Print balances after withdrawal/distribution
+    print("After withdrawAndDistribute:")
+    print_all_balances(contract, mock_pm_address)
+
+    # Final holdings in the contract should be zeroed out
     final_weth = contract.functions.totalWETHDeposited().call() / 1e18
-    final_usdc = contract.functions.totalUSDCDeposited().call() / 1e6
+    final_usdc = contract.functions.totalUSDCDeposited().call() / 1e18
     print(f"\n🏁 Final Holdings after withdrawAndDistribute: {final_weth:.4f} WETH | {final_usdc:.2f} USDC")
 
 if __name__ == "__main__":
